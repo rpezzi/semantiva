@@ -1,6 +1,10 @@
 import numpy as np
-from typing import Iterator, Optional
-from semantiva.data_types import BaseDataType, DataCollectionType
+from typing import Iterator, Optional, List
+from semantiva.data_types import (
+    BaseDataType,
+    DataCollectionType,
+    AnnotatedDataCollection,
+)
 
 
 class ImageDataType(BaseDataType[np.ndarray]):
@@ -147,3 +151,50 @@ class ImageStackDataType(DataCollectionType[ImageDataType, np.ndarray]):
             int: The number of images in the stack.
         """
         return self._data.shape[0]
+
+
+class FloatAnnotatedImageStack(
+    ImageStackDataType, AnnotatedDataCollection[ImageDataType, np.ndarray, float]
+):
+    """
+    A 3D stack of 2D images with an associated annotation parameter list.
+    """
+
+    def __init__(
+        self,
+        data: Optional[np.ndarray] = None,
+        annotations: Optional[List[float]] = None,
+    ):
+        # Explicitly call each parent constructor
+        ImageStackDataType.__init__(self, data)
+        AnnotatedDataCollection.__init__(self, data=self._data, annotations=annotations)
+
+        if self._data.size != 0:
+            n_images = self._data.shape[0]
+            if annotations and len(annotations) != n_images:
+                raise ValueError(
+                    f"Inconsistent lengths: {n_images} images vs. {len(annotations)} parameters."
+                )
+
+    def __iter__(self) -> Iterator[ImageDataType]:
+        # Reuse the iteration logic from ImageStackDataType
+        yield from ImageStackDataType.__iter__(self)
+
+    def append_with_annotation(self, item: ImageDataType, annotation: float) -> None:
+        super().append(item)  # Calls ImageStackDataType's append for the 3D array
+        self.annotations.append(annotation)
+
+    def __len__(self) -> int:
+        # Simply rely on ImageStackDataType's length
+        return ImageStackDataType.__len__(self)
+
+    def items(self) -> Iterator[tuple[float, ImageDataType]]:
+        """
+        Yields (annotation, image) pairs for each slice in the stack.
+        """
+        if len(self) != len(self.annotations):
+            raise ValueError(
+                f"Mismatch: {len(self)} images vs. {len(self.annotations)} annotations parameters."
+            )
+        for i, image in enumerate(self):
+            yield (self.annotations[i], image)

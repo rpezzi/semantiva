@@ -1,4 +1,4 @@
-from typing import Type, TypeVar, Generic, Iterator, get_args, Optional
+from typing import Type, TypeVar, Generic, Iterator, get_args, Optional, List, Tuple
 from abc import ABC, abstractmethod
 
 T = TypeVar("T")
@@ -46,6 +46,46 @@ class BaseDataType(ABC, Generic[T]):
         Returns:
             bool: True if the data is valid, False otherwise.
         """
+
+
+U = TypeVar("U", bound=BaseDataType)
+X = TypeVar("X")  # Data annotation parameter type (e.g., float, tuple, etc.)
+
+
+class AnnotatedDataType(BaseDataType[Tuple[U, X]]):
+    """
+    A wrapper class that encapsulates a data element and its associated annotation parameter.
+
+    This allows collections to handle data and metadata together as a single entity.
+    """
+
+    _annotation: X | None
+
+    def __init__(self, data: U, annotation: Optional[X] = None):
+        """
+        Initializes an AnnotatedDataType.
+
+        Args:
+            data (U): The main data element.
+            annotation (X): The associated annotation parameter.
+        """
+        self._data = data.data
+        self._annotation = annotation
+
+    @property
+    def annotation(self) -> X | None:
+        """Returns the associated annotation parameter."""
+        return self._annotation
+
+    @annotation.setter
+    def annotation(self, annotation: X):
+        """
+        Updates the annotation parameter while preserving the data.
+
+        Args:
+            value (X): The new annotation parameter.
+        """
+        self._annotation = annotation
 
 
 E = TypeVar("E", bound=BaseDataType)
@@ -147,3 +187,68 @@ class DataCollectionType(BaseDataType[S], Generic[E, S]):
             int: The number of elements in the collection.
         """
         pass
+
+
+Y = TypeVar("Y")  # Data annotation type (e.g., float, tuple, etc.)
+V = TypeVar("V", bound=BaseDataType)
+
+
+class AnnotatedDataCollection(DataCollectionType[V, S], Generic[V, S, Y]):
+    """
+    A generic data collection that stores annotation parameters alongside its elements.
+
+    Extends DataCollectionType to include additional metadata that associates
+    annotation parameters (Y) with stored data elements (V).
+    """
+
+    def __init__(
+        self,
+        data: Optional[S] = None,
+        annotations: Optional[List[Y]] = None,
+    ):
+        """
+        Initializes a AnnotatedDataCollection instance.
+
+        Args:
+            data (Optional[S]): The collection data.
+            annotations (Optional[List[X]]): List of annotation parameters corresponding to each data element.
+                Defaults to an empty list if not provided.
+        """
+        super().__init__(data)
+        if annotations is None:
+            annotations = []
+        self.annotations: List[Y] = annotations
+
+    def iter_with_annotations(self) -> Iterator[Tuple[V, Y]]:
+        """
+        Iterates over the elements of the AnnotatedDataCollection,
+        returning tuples of (data element, corresponding annotation).
+
+        Returns:
+            Iterator[Tuple[V, Y]]: An iterator over pairs of data and annotation.
+        """
+        for item, param in zip(self, self.annotations):
+            yield item, param
+
+    def append(self, item: V) -> None:
+        """
+        Appends an element of type V to the collection, maintaining consistency.
+
+        Args:
+            item (V): The data element to append.
+
+        Raises:
+            ValueError: Appending without a annotation parameter is not allowed.
+        """
+        raise ValueError("Use append_with_annotation() to add data with annotation.")
+
+    def append_with_annotation(self, item: V, annotation: Y) -> None:
+        """
+        Appends an element and its corresponding annotation parameter to the collection.
+
+        Args:
+            item (V): The data element to append.
+            annotation (Y): The associated annotation parameter.
+        """
+        self.append(item)
+        self.annotations.append(annotation)
