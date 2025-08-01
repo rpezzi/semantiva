@@ -30,7 +30,7 @@ def test_pipeline():
     """Generate a pipeline for testing."""
     node_configuration = [
         {"processor": FloatCollectValueProbe, "context_keyword": "factor"},
-        {"processor": FloatMultiplyOperation},
+        {"processor": FloatMultiplyOperation, "parameters": {"factor": 2}},
         {"processor": "rename:factor:renamed_key"},
         {"processor": "delete:renamed_key"},
     ]
@@ -68,8 +68,8 @@ def test_build_pipeline_json(test_pipeline):
 
     # Check edges
     assert len(pipeline_json["edges"]) == 3  # Three edges connecting four nodes
-    assert pipeline_json["edges"][0]["source"] == 0
-    assert pipeline_json["edges"][0]["target"] == 1
+    assert pipeline_json["edges"][0]["source"] == 1
+    assert pipeline_json["edges"][0]["target"] == 2
 
 
 def test_get_pipeline_endpoint(test_client):
@@ -122,12 +122,26 @@ def test_pipeline_json_has_parameter_resolution(test_pipeline):
     for node in pipeline_json["nodes"]:
         assert "parameter_resolution" in node
         if node["label"] == "FloatMultiplyOperation":
-            # Check that factor is in the parameter resolution structure
-            # It could be directly in parameter_resolution or in from_context
-            has_factor = "factor" in node["parameter_resolution"] or (
-                "from_context" in node["parameter_resolution"]
-                and "factor" in node["parameter_resolution"]["from_context"]
-            )
-            assert (
-                has_factor
-            ), f"Expected 'factor' in parameter resolution, found: {node['parameter_resolution']}"
+            # factor should appear in parameter resolution from config or context
+            param_res = node["parameter_resolution"]
+            assert "factor" in param_res.get(
+                "from_pipeline_config", {}
+            ) or "factor" in param_res.get("from_context", {})
+
+
+def test_pipeline_json_includes_pipeline_config_params(test_pipeline):
+    """Nodes should include pipelineConfigParams list."""
+    pipeline_json = build_pipeline_json(test_pipeline)
+    for node in pipeline_json["nodes"]:
+        assert "pipelineConfigParams" in node
+    multiply_node = next(
+        n for n in pipeline_json["nodes"] if n["label"] == "FloatMultiplyOperation"
+    )
+    assert multiply_node["pipelineConfigParams"] == ["factor"]
+
+
+def test_pipeline_json_node_ids_start_from_one(test_pipeline):
+    """Node IDs should start from 1 instead of 0."""
+    pipeline_json = build_pipeline_json(test_pipeline)
+    node_ids = [node["id"] for node in pipeline_json["nodes"]]
+    assert node_ids == list(range(1, len(node_ids) + 1))

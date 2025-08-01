@@ -74,21 +74,23 @@
       position: absolute;
       top: 10px;
       bottom: 20px;
-      width: 43%;
-      min-width: 300px;
       border-radius: 12px;
       opacity: 0.3;
       z-index: 0;
     }
     
     .data-channel {
-      left: 5%;
       background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
       border: 2px dashed #1976d2;
     }
-    
+
+    .config-channel {
+      left: 0;
+      background: #eeeeee;
+      border: 2px dashed #cccccc;
+    }
+
     .context-channel {
-      right: 5%;
       background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
       border: 2px dashed #7b1fa2;
     }
@@ -325,6 +327,10 @@
       const [zoomLevel, setZoomLevel] = useState(1);
       const [containerRef, setContainerRef] = useState(null);
       const [anchorMap, setAnchorMap] = useState({});
+      const [graphWidth, setGraphWidth] = useState(0);
+      const [configWidth, setConfigWidth] = useState(80);
+      // gap between Config and Data channels
+      const channelGap = 10;
       const nodeWidth = 300;
       const nodeHeight = 50;
       const verticalSpacing = 80;
@@ -358,11 +364,40 @@
       const handleResetZoom = () => {
         setZoomLevel(1);
       };
-      
-      // Use percentage-based positioning to match channel backgrounds
-      const leftChannelCenter = 24.5; // 27.5% from left (center of left channel which goes from 5% to 50%)
-      const rightChannelCenter = 71.; // 72.5% from left (center of right channel which goes from 50% to 95%)
-      const centerPosition = 50; // 50% for source/sink nodes
+
+      useEffect(() => {
+        if (!containerRef) return;
+        const update = () => setGraphWidth(containerRef.clientWidth);
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+      }, [containerRef]);
+
+      useEffect(() => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.font = '10px sans-serif';
+        let max = 0;
+        nodes.forEach(n => {
+          const text = (n.data.pipelineConfigParams || []).join(', ');
+          max = Math.max(max, ctx.measureText(text).width);
+        });
+        // add extra padding to widen Config column slightly
+        setConfigWidth(max + 25);
+      }, [nodes]);
+
+      // Compute channel centers based on container width
+      // subtract two gaps (between Config-Data and Data-Context) when dividing width
+      const dataWidth = (graphWidth - configWidth - 2 * channelGap) / 2;
+      // Data channel center accounting for initial shift and gap
+      const leftChannelCenter = graphWidth
+        ? ((channelGap + configWidth + channelGap + dataWidth / 2) / graphWidth) * 100
+        : 20;
+      // Context channel center accounting for two gaps
+      const rightChannelCenter = graphWidth
+        ? ((channelGap + configWidth + channelGap + dataWidth + channelGap + dataWidth / 2) / graphWidth) * 100
+        : 80;
+      const centerPosition = 50;
       
       // Calculate positions maintaining original vertical order
       const nodePositions = {};
@@ -414,10 +449,13 @@
             transformOrigin: '0 0'
           }}>
           {/* Channel backgrounds */}
-          <div className="channel-background data-channel">
+          <div className="channel-background config-channel" style={{ width: configWidth, left: channelGap }}>
+            <div className="channel-label">Config</div>
+          </div>
+          <div className="channel-background data-channel" style={{ left: configWidth + 2 * channelGap, width: dataWidth }}>
             <div className="channel-label">Data Channel</div>
           </div>
-          <div className="channel-background context-channel">
+          <div className="channel-background context-channel" style={{ left: configWidth + dataWidth + 3 * channelGap, width: dataWidth }}>
             <div className="channel-label">Context Channel</div>
           </div>
           
@@ -494,6 +532,36 @@
               />
             );
           })}
+
+          {/* Config parameter boxes */}
+          {nodes.map(node => {
+            const pos = nodePositions[node.id];
+            if (!pos) return null;
+            const items = node.data.pipelineConfigParams || [];
+            const text = items.join(', ');
+            return (
+              <div
+                key={"cfg-" + node.id}
+                onClick={() => onNodeClick(null, node)}
+                style={{
+                  position: 'absolute',
+                  left: channelGap,
+                  cursor: 'pointer',
+                  top: pos.y,
+                  width: configWidth,
+                  height: nodeHeight,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#eeeeee',
+                  border: items.length > 0 ? '1px solid #cccccc' : '1px dashed #cccccc',
+                  borderRadius: '6px',
+                  fontSize: '12px'
+                }}>
+                {text}
+              </div>
+            );
+          })}
         </div>
       </div>
       );
@@ -523,8 +591,9 @@
               map[node.id] = node;
               return {
                 id: String(node.id),
-                data: { 
-                  label: node.label + "\n" + (node.input_type || '') + (node.output_type ? ' → ' + node.output_type : '') 
+                data: {
+                  label: node.label + "\n" + (node.input_type || '') + (node.output_type ? ' → ' + node.output_type : ''),
+                  pipelineConfigParams: node.pipelineConfigParams || []
                 },
                 position: { x: idx * 200, y: 100 },
                 type: 'default'

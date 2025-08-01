@@ -35,7 +35,7 @@ def build_pipeline_json(pipeline: Pipeline) -> dict:
 
     nodes = []
     edges = []
-    for idx, node in enumerate(pipeline.nodes):
+    for idx, node in enumerate(pipeline.nodes, start=1):
         meta = node.get_metadata()
         info = {
             "id": idx,
@@ -67,9 +67,10 @@ def build_pipeline_json(pipeline: Pipeline) -> dict:
                 if hasattr(node, "get_suppressed_keys")
                 else []
             ),
+            "pipelineConfigParams": list(getattr(node, "processor_config", {}).keys()),
         }
         nodes.append(info)
-        if idx < len(pipeline.nodes) - 1:
+        if idx < len(pipeline.nodes):
             edges.append({"source": idx, "target": idx + 1})
     return {"nodes": nodes, "edges": edges}
 
