@@ -22,15 +22,21 @@
       background: #e9e9e9; 
     }
     
-    /* Basic styles for our custom graph */
+    /* Wrapping container enabling horizontal scroll */
+    .custom-graph-wrapper {
+      overflow-x: auto;
+      width: 100%;
+    }
+
+    /* Basic styles for our custom graph grid */
     .custom-graph {
       position: relative;
-      overflow: auto;
       background: #fafafa;
       min-width: 800px;
       padding: 0px;
       transform-origin: 0 0;
       transition: transform 0.2s ease;
+      display: grid;
     }
     
     /* Zoom controls */
@@ -220,25 +226,26 @@
     // Individual node component with anchor placeholders
     function PipelineNode({ node, pos, isSelected, onClick, registerAnchors, width, height }) {
       const nodeRef = useRef(null);
-      const topRef = useRef(null);
-      const bottomRef = useRef(null);
-      const leftRef = useRef(null);
-      const rightRef = useRef(null);
+      const topRefs = useRef([null]);
+      const bottomRefs = useRef([null]);
+      const leftParamRefs = useRef([]);
+      const rightParamRefs = useRef([]);
 
       useEffect(() => {
         if (!nodeRef.current) return;
         const rect = nodeRef.current.getBoundingClientRect();
+        const grab = r => r && r.getBoundingClientRect();
         const anchors = {
-          top: topRef.current.getBoundingClientRect(),
-          bottom: bottomRef.current.getBoundingClientRect(),
-          left: leftRef.current.getBoundingClientRect(),
-          right: rightRef.current.getBoundingClientRect(),
+          top: topRefs.current.map(grab).filter(Boolean),
+          bottom: bottomRefs.current.map(grab).filter(Boolean),
+          left: leftParamRefs.current.map(grab).filter(Boolean),
+          right: rightParamRefs.current.map(grab).filter(Boolean),
           node: rect
         };
         registerAnchors(node.id, anchors);
-      });
+      }, [node.id]);
 
-      const leftPercentage = pos.xPercent;
+      const paramCount = (node.data.pipelineConfigParams ? node.data.pipelineConfigParams.length : 0) || 0;
       const nodeWidthToUse = pos.type === 'source-sink' ? 450 : width;
 
       const labelParts = node.data.label.split('\n');
@@ -251,7 +258,7 @@
           key={node.id}
           className={`custom-node ${pos.type} ${isSelected ? 'selected' : ''}`}
           style={{
-            left: `calc(${leftPercentage}% - ${nodeWidthToUse / 2}px)`,
+            left: pos.x - nodeWidthToUse / 2,
             top: pos.y,
             width: nodeWidthToUse,
             height: height
@@ -314,10 +321,16 @@
           </div>
 
           {/* Anchor elements */}
-          <div ref={topRef} className="anchor top" />
-          <div ref={bottomRef} className="anchor bottom" />
-          <div ref={leftRef} className="anchor left" />
-          <div ref={rightRef} className="anchor right" />
+          <div ref={el => (topRefs.current[0] = el)} className="anchor top" />
+          <div ref={el => (bottomRefs.current[0] = el)} className="anchor bottom" />
+          {[...Array(paramCount)].map((_, i) => (
+            <div
+              key={`l-${i}`}
+              ref={el => (leftParamRefs.current[i] = el)}
+              className="anchor left"
+            />
+          ))}
+          <div ref={el => (rightParamRefs.current[0] = el)} className="anchor right" />
         </div>
       );
     }
@@ -327,8 +340,7 @@
       const [zoomLevel, setZoomLevel] = useState(1);
       const [containerRef, setContainerRef] = useState(null);
       const [anchorMap, setAnchorMap] = useState({});
-      const [graphWidth, setGraphWidth] = useState(0);
-      const [configWidth, setConfigWidth] = useState(80);
+      const [colWidths, setColWidths] = useState({ data: 300, config: 80, context: 300 });
       // gap between Config and Data channels
       const channelGap = 10;
       const nodeWidth = 300;
@@ -342,13 +354,21 @@
           x: r.left + r.width / 2 - containerRect.left,
           y: r.top + r.height / 2 - containerRect.top
         });
+        const convertNode = r => ({
+          x: r.left - containerRect.left,
+          y: r.top - containerRect.top,
+          width: r.width,
+          height: r.height
+        });
+        const convArr = arr => arr.map(convert);
         setAnchorMap(prev => ({
           ...prev,
           [id]: {
-            top: convert(rects.top),
-            bottom: convert(rects.bottom),
-            left: convert(rects.left),
-            right: convert(rects.right)
+            top: convArr(rects.top),
+            bottom: convArr(rects.bottom),
+            left: convArr(rects.left),
+            right: convArr(rects.right),
+            node: convertNode(rects.node)
           }
         }));
       };
@@ -365,39 +385,46 @@
         setZoomLevel(1);
       };
 
-      useEffect(() => {
-        if (!containerRef) return;
-        const update = () => setGraphWidth(containerRef.clientWidth);
-        update();
-        window.addEventListener('resize', update);
-        return () => window.removeEventListener('resize', update);
-      }, [containerRef]);
+
 
       useEffect(() => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.font = '10px sans-serif';
-        let max = 0;
-        nodes.forEach(n => {
-          const text = (n.data.pipelineConfigParams || []).join(', ');
-          max = Math.max(max, ctx.measureText(text).width);
+        // Only calculate after anchorMap has entries for nodes
+        const ids = nodes.map(n => n.id);
+        if (!ids.every(id => anchorMap[id] && anchorMap[id].node)) return;
+        // Determine max widths by channel
+        const dataWidths = nodes
+          .filter(n => !(n.data.label.match(/Source|Sink/)))
+          .map(n => anchorMap[n.id].node.width);
+        const ctxWidths = nodes
+          .filter(n => n.data.label.match(/Context|Rename|Delete/))
+          .map(n => anchorMap[n.id].node.width);
+        const configWidths = nodes.map(n => {
+          const params = n.data.pipelineConfigParams;
+          return params.length ? Math.max(...params.map(p => p.length)) : 80;
         });
-        // add extra padding to widen Config column slightly
-        setConfigWidth(max + 25);
-      }, [nodes]);
+        const maxData = Math.max(nodeWidth, ...dataWidths);
+        const maxCtx = Math.max(nodeWidth, ...ctxWidths, 0);
+        const configMax = Math.max(...configWidths, 80);
+        setColWidths({
+          data: maxData + 2 * channelGap,
+          config: configMax + channelGap,
+          context: maxCtx + 2 * channelGap
+        });
+      }, [nodes, anchorMap]);
 
-      // Compute channel centers based on container width
-      // subtract two gaps (between Config-Data and Data-Context) when dividing width
-      const dataWidth = (graphWidth - configWidth - 2 * channelGap) / 2;
-      // Data channel center accounting for initial shift and gap
-      const leftChannelCenter = graphWidth
-        ? ((channelGap + configWidth + channelGap + dataWidth / 2) / graphWidth) * 100
-        : 20;
-      // Context channel center accounting for two gaps
-      const rightChannelCenter = graphWidth
-        ? ((channelGap + configWidth + channelGap + dataWidth + channelGap + dataWidth / 2) / graphWidth) * 100
-        : 80;
-      const centerPosition = 50;
+      // Compute channel centers based on measured column widths
+      const totalWidth =
+        colWidths.config + colWidths.data + colWidths.context + channelGap * 4;
+      const leftChannelCenter =
+        channelGap + colWidths.config + channelGap + colWidths.data / 2;
+      const rightChannelCenter =
+        channelGap +
+        colWidths.config +
+        channelGap +
+        colWidths.data +
+        channelGap +
+        colWidths.context / 2;
+      const centerPosition = (leftChannelCenter + rightChannelCenter) / 2;
       
       // Calculate positions maintaining original vertical order
       const nodePositions = {};
@@ -406,22 +433,22 @@
       // Process all nodes in their original order, just split horizontally by type
       nodes.forEach((node, originalIndex) => {
         const label = node.data.label || '';
-        let nodeType, xPercent;
+        let nodeType, xPos;
         
         // Determine node category and horizontal position
         if (label.includes('Source') || label.includes('Sink') || label.includes('DataSource') || label.includes('DataSink')) {
           nodeType = 'source-sink';
-          xPercent = centerPosition;
+          xPos = centerPosition;
         } else if (label.includes('Context') || label.includes('Rename') || label.includes('Delete')) {
           nodeType = 'context-processor';
-          xPercent = rightChannelCenter;
+          xPos = rightChannelCenter;
         } else {
           nodeType = 'data-processor';
-          xPercent = leftChannelCenter;
+          xPos = leftChannelCenter;
         }
         
         nodePositions[node.id] = {
-          xPercent: xPercent,
+          x: xPos,
           y: currentY,
           type: nodeType
         };
@@ -439,23 +466,31 @@
             <button className="zoom-btn" onClick={handleResetZoom} title="Reset Zoom">⌂</button>
             <button className="zoom-btn" onClick={handleZoomOut} title="Zoom Out">−</button>
           </div>
-          
-          <div ref={setContainerRef} className="custom-graph" style={{
-            position: 'relative',
-            width: '100%',
-            height: '100%',
-            minHeight: `${Math.max(totalHeight * zoomLevel, 500)}px`,
-            transform: `scale(${zoomLevel})`,
-            transformOrigin: '0 0'
-          }}>
+
+          <div className="custom-graph-wrapper">
+          <div
+            ref={setContainerRef}
+            className="custom-graph"
+            style={{
+              position: 'relative',
+              width: totalWidth,
+              height: '100%',
+              minHeight: `${Math.max(totalHeight * zoomLevel, 500)}px`,
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: '0 0',
+              gridTemplateColumns: `${colWidths.config}px ${colWidths.data}px ${colWidths.context}px`,
+              columnGap: `${channelGap}px`,
+              paddingLeft: channelGap,
+              paddingRight: channelGap
+            }}>
           {/* Channel backgrounds */}
-          <div className="channel-background config-channel" style={{ width: configWidth, left: channelGap }}>
+          <div className="channel-background config-channel" style={{ width: colWidths.config, left: channelGap }}>
             <div className="channel-label">Config</div>
           </div>
-          <div className="channel-background data-channel" style={{ left: configWidth + 2 * channelGap, width: dataWidth }}>
+          <div className="channel-background data-channel" style={{ left: colWidths.config + 2 * channelGap, width: colWidths.data }}>
             <div className="channel-label">Data Channel</div>
           </div>
-          <div className="channel-background context-channel" style={{ left: configWidth + dataWidth + 3 * channelGap, width: dataWidth }}>
+          <div className="channel-background context-channel" style={{ left: colWidths.config + colWidths.data + 3 * channelGap, width: colWidths.context }}>
             <div className="channel-label">Context Channel</div>
           </div>
           
@@ -491,8 +526,8 @@
               const targetAnchors = anchorMap[edge.target];
               if (!sourcePos || !targetPos || !sourceAnchors || !targetAnchors) return null;
 
-              const start = sourceAnchors.bottom;
-              const end = targetAnchors.top;
+              const start = sourceAnchors.bottom[0];
+              const end = targetAnchors.top[0];
 
               const arrowColor = sourcePos.type === 'data-processor' ? '#1976d2' :
                                sourcePos.type === 'context-processor' ? '#7b1fa2' : '#d32f2f';
@@ -548,7 +583,7 @@
                   left: channelGap,
                   cursor: 'pointer',
                   top: pos.y,
-                  width: configWidth,
+                  width: colWidths.config,
                   height: nodeHeight,
                   display: 'flex',
                   alignItems: 'center',
@@ -563,6 +598,7 @@
             );
           })}
         </div>
+      </div>
       </div>
       );
     }

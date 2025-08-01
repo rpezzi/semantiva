@@ -145,3 +145,13 @@ def test_pipeline_json_node_ids_start_from_one(test_pipeline):
     pipeline_json = build_pipeline_json(test_pipeline)
     node_ids = [node["id"] for node in pipeline_json["nodes"]]
     assert node_ids == list(range(1, len(node_ids) + 1))
+
+
+def test_index_html_has_graph_wrapper(test_client):
+    """Index HTML should include wrapper and grid style."""
+    resp = test_client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    assert "custom-graph-wrapper" in html
+    assert "custom-graph" in html
+    assert "gridTemplateColumns" in html
