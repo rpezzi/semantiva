@@ -140,6 +140,17 @@ def test_pipeline_json_includes_pipeline_config_params(test_pipeline):
     assert multiply_node["pipelineConfigParams"] == ["factor"]
 
 
+def test_pipeline_json_includes_context_params(test_pipeline):
+    """Nodes should include contextParams list with context-sourced params."""
+    pipeline_json = build_pipeline_json(test_pipeline)
+    for node in pipeline_json["nodes"]:
+        assert "contextParams" in node
+    rename_node = next(n for n in pipeline_json["nodes"] if "Rename" in n["label"])
+    delete_node = next(n for n in pipeline_json["nodes"] if "Delete" in n["label"])
+    assert rename_node["contextParams"] == ["factor"]
+    assert delete_node["contextParams"] == ["renamed_key"]
+
+
 def test_pipeline_json_node_ids_start_from_one(test_pipeline):
     """Node IDs should start from 1 instead of 0."""
     pipeline_json = build_pipeline_json(test_pipeline)

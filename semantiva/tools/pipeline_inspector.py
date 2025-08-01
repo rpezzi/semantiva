@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Protocol, Union
 import inspect
 from semantiva import Pipeline
 from semantiva.logger import Logger
@@ -56,30 +56,35 @@ class PipelineInspector:
         Returns:
             str: A formatted report describing the pipeline composition and relevant details.
         """
+
+        # Create a temporary pipeline-like object for analysis
+        class TempPipeline:
+            def __init__(self, nodes: List[Any]) -> None:
+                self.nodes = nodes
+
+        temp_pipeline = TempPipeline(nodes)
+        analysis = cls.analyze_pipeline(temp_pipeline)
+
         summary_lines = ["Pipeline Structure:"]
-        all_required_params: set[str] = set()
-        injected_or_created_keywords: set[str] = set()
-        deleted_keys: set[str] = set()
-        key_origin: dict[str, int] = {}
-
-        for index, node in enumerate(nodes, start=1):
-            node_summary = cls._build_node_summary(
-                node=node,
-                index=index,
-                deleted_keys=deleted_keys,
-                all_required_params=all_required_params,
-                injected_or_created_keywords=injected_or_created_keywords,
-                key_origin=key_origin,
-            )
-            summary_lines.extend(node_summary)
-
-        required_context_keys = cls._determine_required_context_keys(
-            all_required_params, injected_or_created_keywords
+        summary_lines.append(
+            f"\tRequired context keys: {cls._format_set(analysis['required_context_keys'])}"
         )
 
-        summary_lines.insert(
-            1, f"\tRequired context keys: {cls._format_set(required_context_keys)}"
-        )
+        for node_data in analysis["nodes"]:
+            node_summary_lines = [
+                f"\n\t{node_data['index']}. Node: {node_data['processor_class_name']} ({node_data['component_type']})",
+                f"\t\tParameters: {cls._format_set(node_data['operation_params'])}",
+                f"\t\t\tFrom pipeline configuration: {cls._format_pipeline_config(node_data['processor_config'])}",
+                f"\t\t\tFrom context: {cls._format_context_params(node_data['context_params'], analysis['key_origin'])}",
+                f"\t\tContext additions: {cls._format_set(node_data['created_keys'])}",
+            ]
+
+            if node_data["suppressed_keys"]:
+                node_summary_lines.append(
+                    f"\t\tContext suppressions: {cls._format_set(node_data['suppressed_keys'])}"
+                )
+
+            summary_lines.extend(node_summary_lines)
 
         return "\n".join(summary_lines)
 
@@ -254,80 +259,148 @@ class PipelineInspector:
         Returns:
             str: An extended inspection report.
         """
+        analysis = cls.analyze_pipeline(pipeline)
+
         summary_lines = ["Extended Pipeline Inspection:"]
+        summary_lines.append(
+            f"\tRequired context keys: {cls._format_set(analysis['required_context_keys'])}"
+        )
+
         footnotes: Dict[str, str] = {}
-        all_required: set[str] = set()
-        all_created: set[str] = set()
 
-        for index, node in enumerate(pipeline.nodes, start=1):
-            metadata = node.get_metadata()
-            injected_keys: set[str] = set()
-            required_keys: set[str] = set()
+        for node_data in analysis["nodes"]:
+            # Format context parameters with origins
+            context_params_with_origins = cls._format_context_params(
+                node_data["context_params"], analysis["key_origin"]
+            )
 
-            processor = node.processor
-            processor_class_name = processor.__class__.__name__
-
-            if hasattr(processor, "get_required_context_keys"):
-                required_keys.update(processor.get_required_context_keys())
-
-            if hasattr(processor, "get_required_keys"):
-                required_keys.update(processor.get_required_keys())
-
-            suppressed_keys: set[str] = set()
-            if hasattr(processor, "get_suppressed_keys"):
-                suppressed_keys = set(processor.get_suppressed_keys())
-
-            created_keys: set[str] = set()
-            if hasattr(processor, "get_created_keys"):
-                created_keys.update(processor.get_created_keys())
-                injected_keys |= created_keys
-
-            if isinstance(node, _ProbeContextInjectorNode):
-                injected_key = getattr(node, "context_keyword", None)
-                if injected_key:
-                    injected_keys.add(injected_key)
-                    created_keys.add(injected_key)
-
-            processor_config = node.processor_config
+            # Format config parameters
             config_params_str = (
-                ", ".join(f"{k}={v}" for k, v in processor_config.items())
-                if processor_config
+                ", ".join(f"{k}={v}" for k, v in node_data["processor_config"].items())
+                if node_data["processor_config"]
                 else "None"
             )
 
-            all_required.update(required_keys)
-            all_created.update(created_keys | injected_keys)
+            # Format data types
+            input_type_name = (
+                node_data["input_data_type"].__name__
+                if node_data["input_data_type"]
+                else "None"
+            )
+            output_type_name = (
+                node_data["output_data_type"].__name__
+                if node_data["output_data_type"]
+                else "None"
+            )
 
             summary_lines.extend(
                 [
-                    f"\nNode {index}: {processor_class_name} ({node.__class__.__name__})",
-                    f"    - Component type: {metadata.get('component_type')}",
-                    f"    - Input data type: {node.input_data_type().__name__ if hasattr(node, 'input_data_type') else 'None'}",
-                    f"    - Output data type: {node.output_data_type().__name__ if hasattr(node, 'output_data_type') else 'None'}",
+                    f"\nNode {node_data['index']}: {node_data['processor_class_name']} ({node_data['node_class_name']})",
+                    f"    - Component type: {node_data['component_type']}",
+                    f"    - Input data type: {input_type_name}",
+                    f"    - Output data type: {output_type_name}",
                     f"    - Parameters from pipeline configuration: {config_params_str}",
-                    f"    - Parameters from context: {cls._format_set(required_keys)}",
-                    f"    - Context additions: {cls._format_set(created_keys | injected_keys)}",
-                    f"    - Context suppressions: {cls._format_set(suppressed_keys)}",
+                    f"    - Parameters from context: {context_params_with_origins}",
+                    f"    - Context additions: {cls._format_set(node_data['created_keys'])}",
+                    f"    - Context suppressions: {cls._format_set(node_data['suppressed_keys'])}",
                 ]
             )
 
-            footnote_key = processor_class_name
+            # Add footnote for processor docstring
+            footnote_key = node_data["processor_class_name"]
             if footnote_key not in footnotes:
-                processor_doc = (
-                    inspect.getdoc(processor.__class__) or "No description provided."
-                )
-                footnotes[footnote_key] = processor_doc
-
-        required_final = all_required - all_created
-        summary_lines.insert(
-            1, f"\tRequired context keys: {cls._format_set(required_final)}"
-        )
+                footnotes[footnote_key] = node_data["docstring"]
 
         summary_lines.append("\nFootnotes:")
         for name, doc in footnotes.items():
             summary_lines.extend([f"[{name}]", doc, ""])
 
         return "\n".join(summary_lines)
+
+    @classmethod
+    def get_pipeline_json(cls, pipeline: Pipeline) -> dict:
+        """
+        Get a JSON-serializable representation of the pipeline analysis.
+
+        This method provides the data structure used by the web GUI and other
+        external consumers that need structured pipeline information.
+
+        Args:
+            pipeline (Pipeline): The pipeline to analyze.
+
+        Returns:
+            dict: JSON-serializable pipeline data including nodes and edges.
+        """
+        analysis = cls.analyze_pipeline(pipeline)
+
+        nodes = []
+        edges = []
+
+        for node_data in analysis["nodes"]:
+            # Build parameter resolution info
+            from_config = {}
+            for key, value in node_data["processor_config"].items():
+                from_config[key] = str(value)
+
+            from_context = {}
+            for param in node_data["context_params"]:
+                if param in analysis["key_origin"]:
+                    source_node_idx = analysis["key_origin"][param]
+                    from_context[param] = {
+                        "value": None,
+                        "source": f"Node {source_node_idx}",
+                        "source_idx": source_node_idx,
+                    }
+                else:
+                    from_context[param] = {
+                        "value": None,
+                        "source": "Initial Context",
+                        "source_idx": -1,
+                    }
+
+            parameter_resolution = {
+                "required_params": list(node_data["operation_params"]),
+                "from_pipeline_config": from_config,
+                "from_context": from_context,
+            }
+
+            # Format data types
+            input_type_name = (
+                node_data["input_data_type"].__name__
+                if node_data["input_data_type"]
+                else None
+            )
+            output_type_name = (
+                node_data["output_data_type"].__name__
+                if node_data["output_data_type"]
+                else None
+            )
+
+            node_info = {
+                "id": node_data["index"],
+                "label": node_data["processor_class_name"],
+                "component_type": node_data["component_type"],
+                "input_type": input_type_name,
+                "output_type": output_type_name,
+                "docstring": node_data["docstring"],
+                "parameters": node_data["processor_config"],
+                "parameter_resolution": parameter_resolution,
+                "created_keys": list(node_data["created_keys"]),
+                "required_keys": list(node_data["operation_params"]),
+                "suppressed_keys": list(node_data["suppressed_keys"]),
+                "pipelineConfigParams": list(node_data["config_params"]),
+                "contextParams": list(node_data["context_params"]),
+            }
+
+            nodes.append(node_info)
+
+            # Create edges
+            if node_data["index"] < len(analysis["nodes"]):
+                edges.append(
+                    {"source": node_data["index"], "target": node_data["index"] + 1}
+                )
+
+        return {"nodes": nodes, "edges": edges}
 
     @classmethod
     def get_nodes_semantic_ids_report(cls, nodes: List[_PipelineNode]) -> str:
@@ -411,6 +484,119 @@ class PipelineInspector:
         return cls.inspect_pipeline_extended(pipeline)
 
     @classmethod
+    def analyze_pipeline(cls, pipeline: Union[Pipeline, Any]) -> dict:
+        """
+        Perform a comprehensive analysis of a pipeline, returning structured data.
+
+        This is the single source of truth for all pipeline inspection functionality.
+        All other inspection methods should use this data.
+
+        Args:
+            pipeline (Pipeline): The pipeline to analyze.
+
+        Returns:
+            dict: Comprehensive pipeline analysis including:
+                - nodes: List of node analysis data
+                - required_context_keys: Set of keys required by pipeline but not provided
+                - key_origin: Mapping of context keys to the node that created them
+        """
+        nodes = pipeline.nodes
+        result: Dict[str, Any] = {
+            "nodes": [],
+            "required_context_keys": set(),
+            "key_origin": {},
+            "deleted_keys": set(),
+        }
+
+        # Track context key lifecycle
+        key_origin: dict[str, int] = {}
+        deleted_keys: set[str] = set()
+        all_required_params: set[str] = set()
+        all_created_keys: set[str] = set()
+
+        # Analyze each node
+        for index, node in enumerate(nodes, start=1):
+            metadata = node.get_metadata()
+            processor = node.processor
+
+            # Get all processing parameters (the authoritative source)
+            operation_params = set()
+            if hasattr(processor, "get_processing_parameter_names"):
+                operation_params = set(processor.get_processing_parameter_names())
+
+            # Get configuration parameters
+            config_params = set(node.processor_config.keys())
+
+            # Context parameters are those not provided by configuration
+            context_params = operation_params - config_params
+
+            # Get created keys
+            created_keys = set()
+            if hasattr(processor, "get_created_keys"):
+                created_keys.update(processor.get_created_keys())
+
+            # Handle probe nodes specially
+            if isinstance(node, _ProbeContextInjectorNode):
+                created_keys.add(node.context_keyword)
+                # Only set key origin if this is the first time we see this key
+                if node.context_keyword not in key_origin:
+                    key_origin[node.context_keyword] = index
+
+            # Track key origins for all created keys
+            for key in created_keys:
+                # If a key was deleted but is now recreated, update its origin
+                if key in deleted_keys:
+                    deleted_keys.remove(key)
+                    key_origin[key] = index  # Update to the new creator
+                elif key not in key_origin:
+                    key_origin[key] = index
+
+            # Handle context processor nodes (rename/delete operations)
+            suppressed_keys = set()
+            if isinstance(node, _ContextProcessorNode):
+                suppressed_keys = set(node.get_suppressed_keys())
+                # For context processor nodes, they also have required keys
+                if hasattr(node, "get_required_keys"):
+                    context_params.update(node.get_required_keys())
+                deleted_keys.update(suppressed_keys)
+
+            # Validate deleted keys only for non-context processor nodes
+            # Context processor nodes have special handling for required keys
+            if not isinstance(node, _ContextProcessorNode):
+                cls._validate_deleted_keys(
+                    index, operation_params, config_params, deleted_keys
+                )
+
+            # Build node analysis
+            node_analysis = {
+                "index": index,
+                "processor_class_name": processor.__class__.__name__,
+                "node_class_name": node.__class__.__name__,
+                "component_type": metadata.get("component_type", "Unknown"),
+                "input_data_type": getattr(node, "input_data_type", lambda: None)(),
+                "output_data_type": getattr(node, "output_data_type", lambda: None)(),
+                "processor_config": dict(node.processor_config),
+                "operation_params": operation_params,
+                "config_params": config_params,
+                "context_params": context_params,
+                "created_keys": created_keys,
+                "suppressed_keys": suppressed_keys,
+                "docstring": inspect.getdoc(processor.__class__)
+                or "No description provided.",
+            }
+
+            result["nodes"].append(node_analysis)
+            all_required_params.update(context_params)
+            all_created_keys.update(created_keys)
+
+        # Determine final required context keys
+        result["required_context_keys"] = all_required_params - all_created_keys
+        result["key_origin"] = key_origin
+        result["deleted_keys"] = deleted_keys
+
+        return result
+
+    @classmethod
     def get_node_parameter_resolutions(cls, pipeline: Pipeline) -> list[dict]:
         """
         Get structured parameter resolution information for each node.
@@ -428,67 +614,21 @@ class PipelineInspector:
             list[dict]: A list of dictionaries, one for each node, containing parameter resolution info.
         """
         try:
-            nodes = pipeline.nodes
+            # Use the centralized analysis
+            analysis = cls.analyze_pipeline(pipeline)
             result = []
 
-            # Track created context keys and their origin (1-indexed for human readability)
-            key_origin: dict[str, int] = {}
-            deleted_keys: set[str] = set()
-
-            # First pass: identify all context keys created by any node
-            for idx, node in enumerate(nodes, start=1):
-                created_keys = []
-
-                # Get created keys
-                if hasattr(node, "get_created_keys"):
-                    created_keys.extend(node.get_created_keys())
-                elif hasattr(node.processor, "get_created_keys"):
-                    created_keys.extend(node.processor.get_created_keys())
-
-                # Handle probe nodes specially
-                if hasattr(node, "context_keyword"):
-                    created_keys.append(node.context_keyword)
-
-                # Record key origins (1-indexed for user display)
-                for key in created_keys:
-                    key_origin[key] = idx
-
-                # Track suppressed/deleted keys
-                suppressed_keys = []
-                if hasattr(node, "get_suppressed_keys"):
-                    suppressed_keys = node.get_suppressed_keys()
-                deleted_keys.update(suppressed_keys)
-
-            # Second pass: analyze parameter resolution for each node
-            for idx, node in enumerate(nodes):
-                # Get processing parameters
-                operation_params = []
-                if hasattr(node.processor, "get_processing_parameter_names"):
-                    operation_params = list(
-                        node.processor.get_processing_parameter_names()
-                    )
-                elif hasattr(node, "get_required_keys"):
-                    operation_params = list(node.get_required_keys())
-
-                # Get parameters from configuration
-                config_params = (
-                    list(node.processor_config.keys())
-                    if hasattr(node, "processor_config")
-                    else []
-                )
-                context_params = [p for p in operation_params if p not in config_params]
-
+            for node_data in analysis["nodes"]:
                 # Format parameters from pipeline configuration
                 from_config = {}
-                if hasattr(node, "processor_config"):
-                    for key, value in node.processor_config.items():
-                        from_config[key] = str(value)
+                for key, value in node_data["processor_config"].items():
+                    from_config[key] = str(value)
 
                 # Format parameters from context
                 from_context = {}
-                for param in context_params:
-                    if param in key_origin:
-                        source_node_idx = key_origin[param]
+                for param in node_data["context_params"]:
+                    if param in analysis["key_origin"]:
+                        source_node_idx = analysis["key_origin"][param]
                         from_context[param] = {
                             "value": None,  # We don't have the actual value here
                             "source": f"Node {source_node_idx}",
@@ -501,11 +641,11 @@ class PipelineInspector:
                             "source_idx": -1,
                         }
 
-                # Build the result for this node
+                # Build the result for this node (0-indexed for compatibility)
                 node_info = {
-                    "id": idx,  # Use 1-indexed for nodes (idx) but 0-indexed for the result array
+                    "id": node_data["index"] - 1,  # Convert to 0-indexed
                     "parameter_resolution": {
-                        "required_params": operation_params,
+                        "required_params": list(node_data["operation_params"]),
                         "from_pipeline_config": from_config,
                         "from_context": from_context,
                     },

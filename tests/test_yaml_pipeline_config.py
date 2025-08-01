@@ -60,23 +60,32 @@ def test_load_pipeline_from_yaml():
 
     # Verify the mathematical pipeline progression
     # Starting value from FloatMockDataSource: 42.0
+    # FloatCollectValueProbe: collects 42.0 as "initial_debug"
+    # rename:initial_debug:addend: renames "initial_debug" to "addend" (value still 42.0)
     # After FloatMultiplyOperation (factor=2.5): 42.0 * 2.5 = 105.0
-    # After FloatAddOperation (addend=10.0): 105.0 + 10.0 = 115.0
-    # After FloatSquareOperation: 115.0 ** 2 = 13225.0
-    # After FloatSqrtOperation: sqrt(13225.0) = 115.0
-    # After FloatDivideOperation (divisor=3.0): 115.0 / 3.0 = 38.333...
+    # After FloatSquareOperation: 105.0 ** 2 = 11025.0
+    # After FloatAddOperation (addend=42.0): 11025.0 + 42.0 = 11067.0
+    # After FloatSqrtOperation: sqrt(11067.0) ≈ 105.20
+    # After FloatDivideOperation (divisor=3.0): 105.20 / 3.0 ≈ 35.067
 
-    expected_final_value = 115.0 / 3.0
+    import math
+
+    step1 = 42.0  # Initial value
+    step2 = step1 * 2.5  # Multiply: 105.0
+    step3 = step2**2  # Square: 11025.0
+    step4 = step3 + step1  # Add (addend=initial_value): 11067.0
+    step5 = math.sqrt(step4)  # Sqrt: ~105.20
+    expected_final_value = step5 / 3.0  # Divide: ~35.067
     assert (
         abs(data.data - expected_final_value) < 0.001
     ), f"Expected {expected_final_value}, got {data.data}"
 
     # Verify the context value matches what was collected
-    collected_value = context.get_value("final_value")
-    # This should be the value before the sqrt and divide operations (13225.0)
+    collected_value = context.get_value("final_value").get("value", None)
+    # This should be the final computed value (same as expected_final_value)
     assert (
-        collected_value == 13225.0
-    ), f"Expected context value 13225.0, got {collected_value}"
+        abs(collected_value - expected_final_value) < 0.001
+    ), f"Expected context value {expected_final_value}, got {collected_value}"
 
 
 def test_yaml_configuration_validation():

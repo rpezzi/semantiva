@@ -2,23 +2,19 @@ pipeline:
   nodes:
     - processor: "FloatMockDataSource"
 
-    - processor: "FloatBasicProbe"
-      context_keyword: "debug_info"
+    - processor: "FloatCollectValueProbe"
+      context_keyword: "initial_debug"
+
+    - processor: "rename:initial_debug:addend"
+
 
     - processor: "FloatMultiplyOperation"
       parameters:
         factor: 2.5
 
-    - processor: "FloatAddOperation"
-      parameters:
-        addend: 10.0
-
-    - processor: "rename:debug_info:initial_debug"
-
     - processor: "FloatSquareOperation"
 
-    - processor: "FloatCollectValueProbe"
-      context_keyword: "final_value"
+    - processor: "FloatAddOperation"
 
     - processor: "FloatSqrtOperation"
 
@@ -26,7 +22,10 @@ pipeline:
       parameters:
         divisor: 3.0
 
-    - processor: "delete:initial_debug"
+    - processor: "FloatBasicProbe"
+      context_keyword: "final_value"
+
+    - processor: "delete:addend"
 
     - processor: "FloatMockDataSink"
       parameters:

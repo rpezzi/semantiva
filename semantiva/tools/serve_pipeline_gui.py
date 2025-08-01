@@ -24,55 +24,8 @@ app = FastAPI()
 
 
 def build_pipeline_json(pipeline: Pipeline) -> dict:
-    # Get parameter resolution information using PipelineInspector
-    param_resolutions = PipelineInspector.get_node_parameter_resolutions(pipeline)
-
-    # Create a lookup dictionary for parameter resolutions
-    # Note: param_resolutions uses 0-indexed IDs, so we don't need to adjust them
-    resolution_lookup = {
-        item["id"]: item["parameter_resolution"] for item in param_resolutions
-    }
-
-    nodes = []
-    edges = []
-    for idx, node in enumerate(pipeline.nodes, start=1):
-        meta = node.get_metadata()
-        info = {
-            "id": idx,
-            "label": node.processor.__class__.__name__,
-            "component_type": meta.get("component_type"),
-            "input_type": (
-                (typ := getattr(node, "input_data_type", lambda: None)())
-                and typ.__name__
-            ),
-            "output_type": (
-                (typ := getattr(node, "output_data_type", lambda: None)())
-                and typ.__name__
-            ),
-            "docstring": (
-                node.processor.__class__.__doc__.strip()
-                if node.processor.__class__.__doc__
-                else "No description available."
-            ),
-            "parameters": node.processor_config,
-            "parameter_resolution": resolution_lookup.get(idx, {}),
-            "created_keys": (
-                node.get_created_keys() if hasattr(node, "get_created_keys") else []
-            ),
-            "required_keys": (
-                node.get_required_keys() if hasattr(node, "get_required_keys") else []
-            ),
-            "suppressed_keys": (
-                node.get_suppressed_keys()
-                if hasattr(node, "get_suppressed_keys")
-                else []
-            ),
-            "pipelineConfigParams": list(getattr(node, "processor_config", {}).keys()),
-        }
-        nodes.append(info)
-        if idx < len(pipeline.nodes):
-            edges.append({"source": idx, "target": idx + 1})
-    return {"nodes": nodes, "edges": edges}
+    # Use the centralized pipeline analysis from PipelineInspector
+    return PipelineInspector.get_pipeline_json(pipeline)
 
 
 @app.get("/pipeline")

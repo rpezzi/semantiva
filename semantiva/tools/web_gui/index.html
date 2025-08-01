@@ -211,6 +211,25 @@
       top: 50%;
       transform: translateY(-50%);
     }
+
+    .context-params {
+      position: absolute;
+      right: -4px;
+      top: 50%;
+      transform: translate(100%, -50%);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .param-label.right-anchor {
+      background: #f3e5f5;
+      border: 1px solid #7b1fa2;
+      border-radius: 4px;
+      padding: 2px 4px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -229,21 +248,23 @@
       const topRefs = useRef([null]);
       const bottomRefs = useRef([null]);
       const leftParamRefs = useRef([]);
-      const rightParamRefs = useRef([]);
+      const execRightRef = useRef(null);
+      const paramRightRefs = useRef([]);
 
       useEffect(() => {
         if (!nodeRef.current) return;
         const rect = nodeRef.current.getBoundingClientRect();
         const grab = r => r && r.getBoundingClientRect();
+        const execAnchorRect = execRightRef.current && execRightRef.current.getBoundingClientRect();
         const anchors = {
           top: topRefs.current.map(grab).filter(Boolean),
           bottom: bottomRefs.current.map(grab).filter(Boolean),
           left: leftParamRefs.current.map(grab).filter(Boolean),
-          right: rightParamRefs.current.map(grab).filter(Boolean),
+          right: [execAnchorRect, ...paramRightRefs.current.map(grab).filter(Boolean)].filter(Boolean),
           node: rect
         };
         registerAnchors(node.id, anchors);
-      }, [node.id]);
+      }, [node.id, node.data.contextParams.length]);
 
       const paramCount = (node.data.pipelineConfigParams ? node.data.pipelineConfigParams.length : 0) || 0;
       const nodeWidthToUse = pos.type === 'source-sink' ? 450 : width;
@@ -330,7 +351,18 @@
               className="anchor left"
             />
           ))}
-          <div ref={el => (rightParamRefs.current[0] = el)} className="anchor right" />
+          <div ref={execRightRef} className="anchor right" />
+          <div className="context-params">
+            {node.data.contextParams.map((param, i) => (
+              <div
+                key={param}
+                ref={el => (paramRightRefs.current[i] = el)}
+                className="param-label right-anchor"
+              >
+                {param}
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -629,7 +661,8 @@
                 id: String(node.id),
                 data: {
                   label: node.label + "\n" + (node.input_type || '') + (node.output_type ? ' → ' + node.output_type : ''),
-                  pipelineConfigParams: node.pipelineConfigParams || []
+                  pipelineConfigParams: node.pipelineConfigParams || [],
+                  contextParams: node.contextParams || []
                 },
                 position: { x: idx * 200, y: 100 },
                 type: 'default'
