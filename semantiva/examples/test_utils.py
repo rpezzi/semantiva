@@ -23,7 +23,7 @@ from semantiva.context_processors import ContextType
 
 # Concrete implementation of BaseDataType for testing
 class FloatDataType(BaseDataType[float]):
-    """A data type for floating point values."""
+    """A simple data type that holds a float value."""
 
     def validate(self, data: float) -> bool:
         if not isinstance(data, float):
@@ -58,7 +58,7 @@ class FloatDataCollection(DataCollectionType[FloatDataType, list]):
 
 # Concrete implementation of DataOperation
 class FloatOperation(DataOperation):
-    """An operation specialized in processing FloatDataType data."""
+    """Base class for operations on FloatDataType data."""
 
     @classmethod
     def input_data_type(cls):
@@ -70,7 +70,7 @@ class FloatOperation(DataOperation):
 
 
 class FloatCollectionMergeOperation(DataOperation):
-    """An operation specialized in merging FloatDataCollection data."""
+    """Base class for operations that merge FloatDataCollection data into a single FloatDataType."""
 
     @classmethod
     def input_data_type(cls):
@@ -83,7 +83,7 @@ class FloatCollectionMergeOperation(DataOperation):
 
 # Concrete implementation of DataProbe
 class FloatProbe(DataProbe):
-    """A probe specialized in processing FloatDataType data."""
+    """Base class for probes that process FloatDataType data."""
 
     @classmethod
     def input_data_type(cls):
@@ -91,28 +91,28 @@ class FloatProbe(DataProbe):
 
 
 class FloatMultiplyOperation(FloatOperation):
-    """An operation specialized in multiplying FloatDataType data."""
+    """Multiply FloatDataType data by a factor."""
 
     def _process_logic(self, data, factor: float, *args, **kwargs):
         return FloatDataType(data.data * factor)
 
 
 class FloatAddOperation(FloatOperation):
-    """An operation specialized in adding to FloatDataType data."""
+    """Add a constant to FloatDataType data."""
 
     def _process_logic(self, data, addend: float, *args, **kwargs):
         return FloatDataType(data.data + addend)
 
 
 class FloatSquareOperation(FloatOperation):
-    """An operation specialized in squaring FloatDataType data."""
+    """Square the value of FloatDataType data."""
 
     def _process_logic(self, data, *args, **kwargs):
         return FloatDataType(data.data**2)
 
 
 class FloatSqrtOperation(FloatOperation):
-    """An operation specialized in taking square root of FloatDataType data."""
+    """Extract the square root of FloatDataType data."""
 
     def _process_logic(self, data, *args, **kwargs):
         import math
@@ -121,7 +121,7 @@ class FloatSqrtOperation(FloatOperation):
 
 
 class FloatDivideOperation(FloatOperation):
-    """An operation specialized in dividing FloatDataType data."""
+    """Divide FloatDataType data by a divisor."""
 
     def _process_logic(self, data, divisor: float, *args, **kwargs):
         if divisor == 0:
@@ -130,7 +130,7 @@ class FloatDivideOperation(FloatOperation):
 
 
 class FloatBasicProbe(FloatProbe):
-    """A basic probe for FloatDataType that returns debug information."""
+    """A probe that inspects a FloatDataType data and returns a dictionary with `value`, `type`, and `is_positive` and `abs_value` keys."""
 
     def _process_logic(self, data, *args, **kwargs):
         return {
@@ -142,21 +142,21 @@ class FloatBasicProbe(FloatProbe):
 
 
 class FloatCollectionSumOperation(FloatCollectionMergeOperation):
-    """An operation specialized in summing FloatDataCollection data."""
+    """Sum all FloatDataType items in a FloatDataCollection."""
 
     def _process_logic(self, data, *args, **kwargs):
         return FloatDataType(sum(item.data for item in data.data))
 
 
 class FloatCollectValueProbe(FloatProbe):
-    """A probe specialized in collecting the value of FloatDataType data."""
+    """Collect the value of the provided FloatDataType data."""
 
     def _process_logic(self, data, *args, **kwargs):
         return data.data
 
 
 class FloatMockDataSource(DataSource):
-    """A Mock DataSource for FloatDataType data."""
+    """DataSource for 42.0 as a FloatDataType."""
 
     @classmethod
     def _get_data(cls, *args, **kwargs) -> FloatDataType:
@@ -183,14 +183,6 @@ class FloatMockDataSink(DataSink):
 # -----------------------------------------------------------------------------------
 
 
-class DummyContext(ContextType):
-    """
-    Minimal stand-in for a context type.
-    """
-
-    pass
-
-
 class FloatDataSource(DataSource):
     """
     Concrete implementation of DataSource
@@ -211,12 +203,12 @@ class FloatDataSource(DataSource):
 class FloatPayloadSource(PayloadSource):
     """
     Concrete implementation of PayloadSource
-    providing (FloatDataType, DummyContext) as payload.
+    providing (FloatDataType, ContextType) as payload.
     """
 
     def _get_payload(self, *args, **kwargs) -> Payload:
         # Return a Payload object with data and context
-        return Payload(FloatDataType(456.0), DummyContext())
+        return Payload(FloatDataType(456.0), ContextType())
 
     @classmethod
     def output_data_type(cls):
@@ -251,7 +243,7 @@ class FloatDataSink(DataSink[FloatDataType]):
 class FloatPayloadSink(PayloadSink[FloatDataType]):
     """
     Concrete implementation of PayloadSink
-    accepting (FloatDataType, DummyContext).
+    accepting (FloatDataType, ContextType).
     """
 
     def __init__(self):
