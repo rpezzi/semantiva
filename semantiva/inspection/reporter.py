@@ -259,6 +259,7 @@ def json_report(inspection: PipelineInspection) -> Dict[str, Any]:
             "suppressed_keys": list(node.suppressed_keys),
             "pipelineConfigParams": list(node.config_params.keys()),
             "contextParams": list(node.context_params.keys()),
+            "errors": node.errors,  # Include error information for web GUI
         }
         nodes.append(node_info)
 
@@ -266,7 +267,16 @@ def json_report(inspection: PipelineInspection) -> Dict[str, Any]:
         if node.index < len(inspection.nodes):
             edges.append({"source": node.index, "target": node.index + 1})
 
-    return {"nodes": nodes, "edges": edges}
+    # Include pipeline-level information including errors
+    pipeline_info = {
+        "has_errors": bool(
+            inspection.errors or any(node.errors for node in inspection.nodes)
+        ),
+        "pipeline_errors": inspection.errors,
+        "required_context_keys": list(inspection.required_context_keys),
+    }
+
+    return {"nodes": nodes, "edges": edges, "pipeline": pipeline_info}
 
 
 def parameter_resolutions(inspection: PipelineInspection) -> List[Dict[str, Any]]:

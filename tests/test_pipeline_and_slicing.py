@@ -18,7 +18,7 @@ from semantiva.context_processors.context_types import (
     ContextType,
     ContextCollectionType,
 )
-from semantiva.exceptions import PipelineTopologyError
+from semantiva.exceptions import PipelineConfigurationError
 from semantiva.pipeline import Pipeline, Payload
 from semantiva.examples.test_utils import (
     FloatDataType,
@@ -262,7 +262,7 @@ def test_image_pipeline_invalid_configuration():
     ]
 
     # Check that initializing the pipeline raises an AssertionError
-    with pytest.raises(PipelineTopologyError):
+    with pytest.raises(PipelineConfigurationError):
         _ = Pipeline(node_configurations)
 
 

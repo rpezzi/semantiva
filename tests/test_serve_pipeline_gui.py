@@ -36,7 +36,16 @@ def test_pipeline():
 @pytest.fixture
 def test_client(test_pipeline):
     """Create a FastAPI test client with the test pipeline."""
-    # Set the global pipeline variable for testing
+    # Set the configuration data for testing (new approach)
+    node_configuration = [
+        {"processor": FloatCollectValueProbe, "context_keyword": "factor"},
+        {"processor": FloatMultiplyOperation, "parameters": {"factor": 2}},
+        {"processor": "rename:factor:renamed_key"},
+        {"processor": "delete:renamed_key"},
+    ]
+    app.state.config = node_configuration
+
+    # Also set the pipeline for backward compatibility
     app.state.pipeline = test_pipeline
 
     # Return the test client

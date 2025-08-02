@@ -30,6 +30,7 @@ that web visualizations use the same data structures as CLI inspection tools.
 """
 
 import argparse
+from typing import Union, List, Dict
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -45,7 +46,7 @@ from semantiva.inspection import (
 app = FastAPI()
 
 
-def build_pipeline_json(pipeline: Pipeline) -> dict:
+def build_pipeline_json(pipeline_or_config: Union[Pipeline, List[Dict]]) -> dict:
     """Generate JSON representation of pipeline using the inspection system.
 
     This function serves as the integration point between the web GUI and the
@@ -53,7 +54,9 @@ def build_pipeline_json(pipeline: Pipeline) -> dict:
     same data structures and analysis as CLI tools.
 
     Args:
-        pipeline: Semantiva pipeline to analyze and convert to JSON
+        pipeline_or_config: Either a Semantiva Pipeline object or raw configuration data
+            (List[Dict]). The inspection system can handle both valid and invalid
+            configurations without raising exceptions.
 
     Returns:
         Dictionary containing nodes and edges data for web visualization
@@ -61,21 +64,40 @@ def build_pipeline_json(pipeline: Pipeline) -> dict:
     Note:
         This function replaces the previous direct pipeline analysis with
         a call to the inspection system's json_report() function, ensuring
-        consistency across all pipeline introspection tools.
+        consistency across all pipeline introspection tools. It can handle
+        invalid configurations that would fail during Pipeline construction.
     """
     # Use the new inspection system for consistent data generation
-    inspection = build_pipeline_inspection(pipeline)
+    inspection = build_pipeline_inspection(pipeline_or_config)
+
+    # Run validation to populate errors in the inspection (but don't raise exceptions here)
+    try:
+        from semantiva.inspection.validator import validate_pipeline
+
+        validate_pipeline(inspection)
+    except Exception:
+        # Validation failed, but errors are now populated in the inspection data
+        pass
+
     # Convert inspection data to JSON format suitable for web visualization
     return json_report(inspection)
 
 
 @app.get("/api/pipeline")
 def get_pipeline_api():
-    if not hasattr(app.state, "pipeline") or app.state.pipeline is None:
-        raise HTTPException(
-            status_code=404, detail="Pipeline not found. Please load a pipeline first."
-        )
-    return build_pipeline_json(app.state.pipeline)
+    # Check for configuration data first (new approach)
+    if hasattr(app.state, "config") and app.state.config is not None:
+        return build_pipeline_json(app.state.config)
+
+    # Fall back to pipeline object for backward compatibility
+    if hasattr(app.state, "pipeline") and app.state.pipeline is not None:
+        return build_pipeline_json(app.state.pipeline)
+
+    # Neither configuration nor pipeline available
+    raise HTTPException(
+        status_code=404,
+        detail="Pipeline configuration not found. Please load a pipeline first.",
+    )
 
 
 @app.get("/pipeline")
@@ -96,15 +118,37 @@ def main():
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
-    # Load the pipeline
+    # Load the pipeline configuration (doesn't create Pipeline object)
     config = load_pipeline_from_yaml(args.yaml)
-    app.state.pipeline = Pipeline(config)
+    app.state.config = config
 
-    # Print inspection information
-    inspection = build_pipeline_inspection(app.state.pipeline)
+    # Print inspection information using the raw configuration
+    # This works even for invalid configurations that would fail Pipeline construction
+    inspection = build_pipeline_inspection(config)
+
+    # Run validation to populate errors in the inspection (but don't raise exceptions here)
+    try:
+        from semantiva.inspection.validator import validate_pipeline
+
+        validate_pipeline(inspection)
+    except Exception:
+        # Validation failed, but errors are now populated in the inspection data
+        pass
+
     print("Pipeline Inspector:", summary_report(inspection))
     print("-" * 40)
     print("Extended Pipeline Inspection:", extended_report(inspection))
+
+    # Also try to create a Pipeline object for backward compatibility, but don't fail if it doesn't work
+    app.state.pipeline = None
+    try:
+        app.state.pipeline = Pipeline(config)
+        print("-" * 40)
+        print("Pipeline object created successfully - configuration is valid")
+    except Exception as e:
+        print("-" * 40)
+        print(f"Pipeline object creation failed: {e}")
+        print("Continuing with inspection-only mode for invalid configuration")
 
     static_dir = Path(__file__).parent / "web_gui" / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

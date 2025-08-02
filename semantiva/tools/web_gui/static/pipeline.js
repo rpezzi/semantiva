@@ -30,12 +30,13 @@
       const labelParts = node.data.label.split('\n');
       const nodeName = labelParts[0];
       const typeInfo = labelParts.slice(1).join(' ');
+      const hasErrors = node.data.hasErrors || false;
 
       return (
         <div
           ref={nodeRef}
           key={node.id}
-          className={`custom-node ${pos.type} ${isSelected ? 'selected' : ''}`}
+          className={`custom-node ${pos.type} ${isSelected ? 'selected' : ''} ${hasErrors ? 'error' : ''}`}
           style={{
             left: pos.x - nodeWidthToUse / 2,
             top: pos.y,
@@ -405,6 +406,9 @@
               <marker id="arrow-black" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
                 <polygon points="0 0, 6 2.5, 0 5" fill="#000000" />
               </marker>
+              <marker id="arrow-red" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                <polygon points="0 0, 6 2.5, 0 5" fill="#dc3545" />
+              </marker>
             </defs>
             
             {edges.map(edge => {
@@ -425,6 +429,11 @@
               const endX = targetPos.x;
               const endY = targetPos.y;
 
+              // Use red styling for edges with data type incompatibility errors
+              const hasError = edge.hasError || false;
+              const strokeColor = hasError ? "#dc3545" : "#000000";
+              const markerUrl = hasError ? "url(#arrow-red)" : "url(#arrow-black)";
+
               return (
                 <line
                   key={edge.id}
@@ -432,10 +441,10 @@
                   y1={startY}
                   x2={endX}
                   y2={endY}
-                  stroke="#000000"
+                  stroke={strokeColor}
                   strokeWidth="1.5"
                   strokeDasharray="5,3"
-                  markerEnd="url(#arrow-black)"
+                  markerEnd={markerUrl}
                 />
               );
             })}
@@ -470,6 +479,7 @@
       const [rfEdges, setRfEdges] = useState([]);
       const [nodeInfo, setNodeInfo] = useState(null);
       const [nodeMap, setNodeMap] = useState({});
+      const [pipelineInfo, setPipelineInfo] = useState(null); // Add pipeline info state
       const [error, setError] = useState(null);
       const [loading, setLoading] = useState(true);
       const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -484,6 +494,10 @@
           })
           .then(data => {
             console.log('Pipeline data loaded:', data);
+            
+            // Store pipeline-level information
+            setPipelineInfo(data.pipeline || { has_errors: false, pipeline_errors: [], required_context_keys: [] });
+            
             const map = {};
             const n = data.nodes.map((node, idx) => {
               map[node.id] = node;
@@ -493,18 +507,31 @@
                   label: node.label + "\n" + (node.input_type || '') + (node.output_type ? ' → ' + node.output_type : ''),
                   pipelineConfigParams: node.pipelineConfigParams || [],
                   contextParams: node.contextParams || [],
-                  createdKeys: node.created_keys || []
+                  createdKeys: node.created_keys || [],
+                  errors: node.errors || [], // Include error information
+                  hasErrors: (node.errors && node.errors.length > 0), // Add convenient flag
                 },
                 position: { x: idx * 200, y: 100 },
                 type: 'default'
               };
             });
-            const e = data.edges.map(edge => ({ 
-              id: edge.source + '-' + edge.target, 
-              source: String(edge.source), 
-              target: String(edge.target),
-              type: 'default'
-            }));
+            
+            // Check for data type incompatibility errors between consecutive nodes
+            const e = data.edges.map(edge => {
+              const sourceNode = data.nodes.find(n => n.id === edge.source);
+              const targetNode = data.nodes.find(n => n.id === edge.target);
+              const hasDataTypeError = targetNode && targetNode.errors && 
+                targetNode.errors.some(err => err.includes('Data type incompatibility'));
+              
+              return { 
+                id: edge.source + '-' + edge.target, 
+                source: String(edge.source), 
+                target: String(edge.target),
+                type: 'default',
+                hasError: hasDataTypeError // Mark edges with data type incompatibility
+              };
+            });
+            
             setRfNodes(n); 
             setRfEdges(e); 
             setNodeMap(map);
@@ -660,7 +687,22 @@
           </div>
           <div id="graph">
             <div style={{ padding: '10px', borderBottom: '1px solid #ddd', background: '#f8f9fa' }}>
-              <h3 style={{ margin: '0', color: '#007acc' }}>Semantiva Dual-Channel Pipeline Visualization</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: '0', color: '#007acc' }}>Semantiva Dual-Channel Pipeline Visualization</h3>
+                {pipelineInfo && pipelineInfo.has_errors && (
+                  <span style={{ 
+                    color: '#dc3545', 
+                    fontWeight: 'bold', 
+                    fontSize: '16px',
+                    background: '#f8d7da',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #dc3545'
+                  }}>
+                    Invalid Pipeline
+                  </span>
+                )}
+              </div>
               <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}>
                 <span style={{ color: '#1976d2', fontWeight: 'bold' }}>Data Processing</span> • 
                 <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}> Context Processing</span> • 
@@ -797,6 +839,32 @@
                     </div>
                   )}
                 </div>
+                
+                {/* Errors Section */}
+                {nodeInfo.errors && nodeInfo.errors.length > 0 && (
+                  <div>
+                    <h4 style={{ color: '#dc3545', margin: '20px 0 10px 0', borderBottom: '1px solid #dc3545', paddingBottom: '5px' }}>
+                      Errors
+                    </h4>
+                    <div style={{
+                      background: '#f8d7da', 
+                      border: '1px solid #dc3545',
+                      borderRadius: '4px',
+                      padding: '10px'
+                    }}>
+                      {nodeInfo.errors.map((error, index) => (
+                        <div key={index} style={{
+                          color: '#721c24',
+                          fontSize: '13px',
+                          marginBottom: index < nodeInfo.errors.length - 1 ? '8px' : '0',
+                          lineHeight: '1.4'
+                        }}>
+                          • {error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>

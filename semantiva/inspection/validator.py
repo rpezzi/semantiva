@@ -37,6 +37,38 @@ from semantiva.exceptions import PipelineConfigurationError
 from .builder import PipelineInspection
 
 
+def _validate_data_flow_compatibility(inspection: PipelineInspection) -> None:
+    """Validate data type compatibility between consecutive nodes in the pipeline.
+
+    This function checks that the output data type of each node is compatible
+    with the input data type of the next node. Any incompatibilities are recorded
+    as errors in the affected nodes.
+
+    Args:
+        inspection: Complete pipeline inspection data to validate
+
+    Note:
+        - Nodes with None input/output types are skipped (e.g., context processors)
+        - Errors are added to the node that has the incompatible input type
+        - Only validates consecutive data-processing nodes
+    """
+    for i in range(len(inspection.nodes) - 1):
+        current_node = inspection.nodes[i]
+        next_node = inspection.nodes[i + 1]
+
+        # Skip validation if either node has no data types (e.g., context processors)
+        if current_node.output_type is None or next_node.input_type is None:
+            continue
+
+        # Check if output type of current node matches input type of next node
+        if current_node.output_type != next_node.input_type:
+            error_msg = (
+                f"Data type incompatibility: receives {next_node.input_type.__name__} "
+                f"but previous node (Node {current_node.index}) outputs {current_node.output_type.__name__}"
+            )
+            next_node.errors.append(error_msg)
+
+
 def validate_pipeline(inspection: PipelineInspection) -> None:
     """Raise :class:`PipelineConfigurationError` if inspection contains errors.
 
@@ -57,6 +89,9 @@ def validate_pipeline(inspection: PipelineInspection) -> None:
         exceptions. The inspection builder always succeeds and records errors
         for later validation, allowing tools to inspect invalid configurations.
     """
+    # Perform data flow validation first (adds errors to nodes)
+    _validate_data_flow_compatibility(inspection)
+
     msgs: List[str] = []
 
     # Collect pipeline-level errors

@@ -47,6 +47,7 @@ from .reporter import (
     json_report,
     parameter_resolutions,
 )
+from .validator import validate_pipeline
 
 __all__ = [
     "NodeInspection",
@@ -56,4 +57,5 @@ __all__ = [
     "extended_report",
     "json_report",
     "parameter_resolutions",
+    "validate_pipeline",
 ]

@@ -110,10 +110,9 @@ def test_builder_records_errors_and_validator_raises():
         {"processor": "delete:factor"},  # Delete the factor
         {"processor": FloatMultiplyOperation},  # This needs factor - should error
     ]
-    pipeline = Pipeline(config)
 
-    # Inspection should succeed and capture the error
-    inspection = build_pipeline_inspection(pipeline)
+    # Build inspection directly from config (this should succeed even with invalid config)
+    inspection = build_pipeline_inspection(config)
     assert inspection.nodes[2].errors  # Third node should have error about deleted key
 
     # Validator should raise exception based on captured errors

@@ -29,8 +29,17 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_pipeline_from_yaml(args.yaml)
-    pipeline = Pipeline(config)
-    data = build_pipeline_json(pipeline)
+
+    # Try to create Pipeline object first, but fall back to inspection-only mode if it fails
+    try:
+        pipeline = Pipeline(config)
+        data = build_pipeline_json(pipeline)
+    except Exception as e:
+        print(
+            f"Warning: Pipeline construction failed ({e}). Using inspection-only mode."
+        )
+        # Use inspection system directly on configuration data
+        data = build_pipeline_json(config)
 
     template_dir = Path(__file__).parent / "web_gui"
     template_path = template_dir / "index.html"
