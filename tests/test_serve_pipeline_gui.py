@@ -100,18 +100,6 @@ def test_index_endpoint(test_client):
     )  # 404 is acceptable if the file doesn't exist in test
 
 
-def test_debug_endpoint(test_client):
-    """Test the /debug endpoint."""
-    try:
-        response = test_client.get("/debug")
-        assert (
-            response.status_code == 200 or response.status_code == 404
-        )  # 404 is acceptable if the file doesn't exist in test
-    except RuntimeError as e:
-        # The file doesn't exist, which is also acceptable for the test
-        assert "does not exist" in str(e)
-
-
 def test_pipeline_json_has_parameter_resolution(test_pipeline):
     """Test that the pipeline JSON includes parameter resolution data."""
     # Get the pipeline JSON
@@ -157,11 +145,10 @@ def test_pipeline_json_node_ids_start_from_one(test_pipeline):
     assert node_ids == list(range(1, len(node_ids) + 1))
 
 
-def test_index_html_has_graph_wrapper(test_client):
-    """Index HTML should include wrapper and grid style."""
+def test_index_html_references_static_assets(test_client):
+    """Index HTML should reference compiled static assets."""
     resp = test_client.get("/")
     assert resp.status_code == 200
     html = resp.text
-    assert "custom-graph-wrapper" in html
-    assert "custom-graph" in html
-    assert "gridTemplateColumns" in html
+    assert "/static/pipeline.js" in html
+    assert "/static/pipeline.css" in html

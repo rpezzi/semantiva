@@ -1,0 +1,739 @@
+    const {useState, useEffect, useRef} = React;
+
+    // Individual node component with anchor placeholders
+    function PipelineNode({ node, pos, isSelected, onClick, registerAnchors, width, height }) {
+      const nodeRef = useRef(null);
+      const topRefs = useRef([null]);
+      const bottomRefs = useRef([null]);
+      const leftParamRefs = useRef([]);
+      const execRightRef = useRef(null);
+      const paramRightRefs = useRef([]);
+
+      useEffect(() => {
+        if (!nodeRef.current) return;
+        const rect = nodeRef.current.getBoundingClientRect();
+        const grab = r => r && r.getBoundingClientRect();
+        const execAnchorRect = execRightRef.current && execRightRef.current.getBoundingClientRect();
+        const anchors = {
+          top: topRefs.current.map(grab).filter(Boolean),
+          bottom: bottomRefs.current.map(grab).filter(Boolean),
+          left: leftParamRefs.current.map(grab).filter(Boolean),
+          right: [execAnchorRect, ...paramRightRefs.current.map(grab).filter(Boolean)].filter(Boolean),
+          node: rect
+        };
+        registerAnchors(node.id, anchors);
+      }, [node.id, node.data.contextParams.length]);
+
+      const paramCount = (node.data.pipelineConfigParams ? node.data.pipelineConfigParams.length : 0) || 0;
+      const nodeWidthToUse = pos.type === 'source-sink' ? 450 : width;
+
+      const labelParts = node.data.label.split('\n');
+      const nodeName = labelParts[0];
+      const typeInfo = labelParts.slice(1).join(' ');
+
+      return (
+        <div
+          ref={nodeRef}
+          key={node.id}
+          className={`custom-node ${pos.type} ${isSelected ? 'selected' : ''}`}
+          style={{
+            left: pos.x - nodeWidthToUse / 2,
+            top: pos.y,
+            width: nodeWidthToUse,
+            height: height
+          }}
+          onClick={() => onClick(null, node)}
+        >
+          <div
+            style={{
+              fontWeight: 'bold',
+              marginBottom: '8px',
+              fontSize: '14px',
+              color: '#333',
+              wordWrap: 'break-word'
+            }}
+          >
+            {nodeName}
+          </div>
+          <div
+            style={{
+              fontSize: '11px',
+              color: '#666',
+              wordWrap: 'break-word'
+            }}
+          >
+            {typeInfo}
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: '5px',
+              right: '8px',
+              fontSize: '10px',
+              color: '#999',
+              fontWeight: 'bold'
+            }}
+          >
+            #{node.id}
+          </div>
+          {/* Channel indicator */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '5px',
+              left: '8px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              color:
+                pos.type === 'data-processor'
+                  ? '#1976d2'
+                  : pos.type === 'context-processor'
+                  ? '#7b1fa2'
+                  : '#d32f2f'
+            }}
+          >
+            {pos.type === 'data-processor'
+              ? 'DATA'
+              : pos.type === 'context-processor'
+              ? 'CTX'
+              : 'I/O'}
+          </div>
+
+          {/* Anchor elements */}
+          <div ref={el => (topRefs.current[0] = el)} className="anchor top" />
+          <div ref={el => (bottomRefs.current[0] = el)} className="anchor bottom" />
+          {[...Array(paramCount)].map((_, i) => (
+            <div
+              key={`l-${i}`}
+              ref={el => (leftParamRefs.current[i] = el)}
+              className="anchor left"
+            />
+          ))}
+          <div ref={execRightRef} className="anchor right" />
+          <div className="context-params">
+            {node.data.contextParams.map((param, i) => (
+              <div
+                key={param}
+                ref={el => (paramRightRefs.current[i] = el)}
+                className="param-label right-anchor"
+              >
+                {param}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Custom Graph Component with dual-channel layout
+    function CustomGraph({ nodes, edges, onNodeClick, selectedNodeId }) {
+      const [zoomLevel, setZoomLevel] = useState(1);
+      const [containerRef, setContainerRef] = useState(null);
+      const [anchorMap, setAnchorMap] = useState({});
+      const [colWidths, setColWidths] = useState({ data: 300, config: 80, context: 300 });
+      // gap between Config and Data channels
+      const channelGap = 10;
+      const nodeWidth = 300;
+      const nodeHeight = 50;
+      const verticalSpacing = 80;
+
+      const registerAnchors = (id, rects) => {
+        if (!containerRef) return;
+        const containerRect = containerRef.getBoundingClientRect();
+        const convert = r => ({
+          x: r.left + r.width / 2 - containerRect.left,
+          y: r.top + r.height / 2 - containerRect.top
+        });
+        const convertNode = r => ({
+          x: r.left - containerRect.left,
+          y: r.top - containerRect.top,
+          width: r.width,
+          height: r.height
+        });
+        const convArr = arr => arr.map(convert);
+        setAnchorMap(prev => ({
+          ...prev,
+          [id]: {
+            top: convArr(rects.top),
+            bottom: convArr(rects.bottom),
+            left: convArr(rects.left),
+            right: convArr(rects.right),
+            node: convertNode(rects.node)
+          }
+        }));
+      };
+      
+      const handleZoomIn = () => {
+        setZoomLevel(prev => Math.min(prev + 0.2, 2.0));
+      };
+      
+      const handleZoomOut = () => {
+        setZoomLevel(prev => Math.max(prev - 0.2, 0.4));
+      };
+      
+      const handleResetZoom = () => {
+        setZoomLevel(1);
+      };
+
+
+
+      useEffect(() => {
+        // Only calculate after anchorMap has entries for nodes
+        const ids = nodes.map(n => n.id);
+        if (!ids.every(id => anchorMap[id] && anchorMap[id].node)) return;
+        // Determine max widths by channel
+        const dataWidths = nodes
+          .filter(n => !(n.data.label.match(/Source|Sink/)))
+          .map(n => anchorMap[n.id].node.width);
+        const ctxWidths = nodes
+          .filter(n => n.data.label.match(/Context|Rename|Delete/))
+          .map(n => anchorMap[n.id].node.width);
+        const configWidths = nodes.map(n => {
+          const params = n.data.pipelineConfigParams;
+          return params.length ? Math.max(...params.map(p => p.length)) : 80;
+        });
+        const maxData = Math.max(nodeWidth, ...dataWidths);
+        const maxCtx = Math.max(nodeWidth, ...ctxWidths, 0);
+        const configMax = Math.max(...configWidths, 80);
+        setColWidths({
+          data: maxData + 2 * channelGap,
+          config: configMax + channelGap,
+          context: maxCtx + 2 * channelGap
+        });
+      }, [nodes, anchorMap]);
+
+      // Compute channel centers based on measured column widths
+      const totalWidth =
+        colWidths.config + colWidths.data + colWidths.context + channelGap * 4;
+      const leftChannelCenter =
+        channelGap + colWidths.config + channelGap + colWidths.data / 2;
+      const rightChannelCenter =
+        channelGap +
+        colWidths.config +
+        channelGap +
+        colWidths.data +
+        channelGap +
+        colWidths.context / 2;
+      const centerPosition = (leftChannelCenter + rightChannelCenter) / 2;
+      
+      // Calculate positions maintaining original vertical order
+      const nodePositions = {};
+      let currentY = 60; // Start lower to reveal channel titles
+      
+      // Process all nodes in their original order, just split horizontally by type
+      nodes.forEach((node, originalIndex) => {
+        const label = node.data.label || '';
+        let nodeType, xPos;
+        
+        // Determine node category and horizontal position
+        if (label.includes('Source') || label.includes('Sink') || label.includes('DataSource') || label.includes('DataSink')) {
+          nodeType = 'source-sink';
+          xPos = centerPosition;
+        } else if (label.includes('Context') || label.includes('Rename') || label.includes('Delete')) {
+          nodeType = 'context-processor';
+          xPos = rightChannelCenter;
+        } else {
+          nodeType = 'data-processor';
+          xPos = leftChannelCenter;
+        }
+        
+        nodePositions[node.id] = {
+          x: xPos,
+          y: currentY,
+          type: nodeType
+        };
+        
+        currentY += nodeHeight + verticalSpacing;
+      });
+      
+      const totalHeight = currentY + 80;
+
+      return (
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          {/* Zoom controls */}
+          <div className="zoom-controls">
+            <button className="zoom-btn" onClick={handleZoomIn} title="Zoom In">+</button>
+            <button className="zoom-btn" onClick={handleResetZoom} title="Reset Zoom">⌂</button>
+            <button className="zoom-btn" onClick={handleZoomOut} title="Zoom Out">−</button>
+          </div>
+
+          <div className="custom-graph-wrapper">
+          <div
+            ref={setContainerRef}
+            className="custom-graph"
+            style={{
+              position: 'relative',
+              width: totalWidth,
+              height: '100%',
+              minHeight: `${Math.max(totalHeight * zoomLevel, 500)}px`,
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: '0 0',
+              gridTemplateColumns: `${colWidths.config}px ${colWidths.data}px ${colWidths.context}px`,
+              columnGap: `${channelGap}px`,
+              paddingLeft: channelGap,
+              paddingRight: channelGap
+            }}>
+          {/* Channel backgrounds */}
+          <div className="channel-background config-channel" style={{ width: colWidths.config, left: channelGap }}>
+            <div className="channel-label">Config</div>
+          </div>
+          <div className="channel-background data-channel" style={{ left: colWidths.config + 2 * channelGap, width: colWidths.data }}>
+            <div className="channel-label">Data Channel</div>
+          </div>
+          <div className="channel-background context-channel" style={{ left: colWidths.config + colWidths.data + 3 * channelGap, width: colWidths.context }}>
+            <div className="channel-label">Context Channel</div>
+          </div>
+          
+          {/* Render edges (arrows) - Use single SVG for all arrows */}
+          <svg style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            width: '100%', 
+            height: '100%', 
+            zIndex: 5,
+            pointerEvents: 'none' 
+          }}>
+            <defs>
+              <marker id="straight-arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#1976d2" />
+              </marker>
+              <marker id="straight-arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#7b1fa2" />
+              </marker>
+              <marker id="straight-arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#d32f2f" />
+              </marker>
+              <marker id="cross-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#ff6b6b" />
+              </marker>
+            </defs>
+            
+            {edges.map(edge => {
+              const sourcePos = nodePositions[edge.source];
+              const targetPos = nodePositions[edge.target];
+              const sourceAnchors = anchorMap[edge.source];
+              const targetAnchors = anchorMap[edge.target];
+              if (!sourcePos || !targetPos || !sourceAnchors || !targetAnchors) return null;
+
+              const start = sourceAnchors.bottom[0];
+              const end = targetAnchors.top[0];
+
+              const arrowColor = sourcePos.type === 'data-processor' ? '#1976d2' :
+                               sourcePos.type === 'context-processor' ? '#7b1fa2' : '#d32f2f';
+              const markerId = sourcePos.type === 'data-processor' ? 'straight-arrow-blue' :
+                             sourcePos.type === 'context-processor' ? 'straight-arrow-purple' : 'straight-arrow-red';
+
+              return (
+                <line
+                  key={edge.id}
+                  x1={start.x}
+                  y1={start.y}
+                  x2={end.x}
+                  y2={end.y}
+                  stroke={arrowColor}
+                  strokeWidth="3"
+                  markerEnd={`url(#${markerId})`}
+                />
+              );
+            })}
+          </svg>
+          
+          {/* Render nodes */}
+          {nodes.map(node => {
+            const pos = nodePositions[node.id];
+            if (!pos) return null;
+            const isSelected = selectedNodeId === node.id;
+            return (
+              <PipelineNode
+                key={node.id}
+                node={node}
+                pos={pos}
+                isSelected={isSelected}
+                onClick={onNodeClick}
+                registerAnchors={registerAnchors}
+                width={nodeWidth}
+                height={nodeHeight}
+              />
+            );
+          })}
+
+          {/* Config parameter boxes */}
+          {nodes.map(node => {
+            const pos = nodePositions[node.id];
+            if (!pos) return null;
+            const items = node.data.pipelineConfigParams || [];
+            const text = items.join(', ');
+            return (
+              <div
+                key={"cfg-" + node.id}
+                onClick={() => onNodeClick(null, node)}
+                style={{
+                  position: 'absolute',
+                  left: channelGap,
+                  cursor: 'pointer',
+                  top: pos.y,
+                  width: colWidths.config,
+                  height: nodeHeight,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#eeeeee',
+                  border: items.length > 0 ? '1px solid #cccccc' : '1px dashed #cccccc',
+                  borderRadius: '6px',
+                  fontSize: '12px'
+                }}>
+                {text}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      </div>
+      );
+    }
+
+    function App() {
+      const [rfNodes, setRfNodes] = useState([]);
+      const [rfEdges, setRfEdges] = useState([]);
+      const [nodeInfo, setNodeInfo] = useState(null);
+      const [nodeMap, setNodeMap] = useState({});
+      const [error, setError] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [selectedNodeId, setSelectedNodeId] = useState(null);
+
+      useEffect(() => {
+        console.log('Loading pipeline data...');
+        
+        fetch('/api/pipeline')
+          .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+            return r.json();
+          })
+          .then(data => {
+            console.log('Pipeline data loaded:', data);
+            const map = {};
+            const n = data.nodes.map((node, idx) => {
+              map[node.id] = node;
+              return {
+                id: String(node.id),
+                data: {
+                  label: node.label + "\n" + (node.input_type || '') + (node.output_type ? ' → ' + node.output_type : ''),
+                  pipelineConfigParams: node.pipelineConfigParams || [],
+                  contextParams: node.contextParams || []
+                },
+                position: { x: idx * 200, y: 100 },
+                type: 'default'
+              };
+            });
+            const e = data.edges.map(edge => ({ 
+              id: edge.source + '-' + edge.target, 
+              source: String(edge.source), 
+              target: String(edge.target),
+              type: 'default'
+            }));
+            setRfNodes(n); 
+            setRfEdges(e); 
+            setNodeMap(map);
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error('Error loading pipeline:', err);
+            setError(err.message);
+            setLoading(false);
+          });
+      }, []);
+
+      const onNodeClick = (_, node) => {
+        console.log('Node clicked:', node);
+        const nodeData = nodeMap[parseInt(node.id)];
+        setNodeInfo(nodeData);
+        setSelectedNodeId(node.id);
+      };
+
+      if (error) {
+        return (
+          <div className="error">
+            <h2>Error loading pipeline</h2>
+            <p>{error}</p>
+            <p>Check the browser console for more details.</p>
+          </div>
+        );
+      }
+
+      if (loading) {
+        return <div className="loading">Loading pipeline...</div>;
+      }
+
+      return (
+        <div style={{display:'flex', height:'100%', width:'100%'}}>
+          <div id="sidebar">
+            <h3 style={{margin:'10px 5px', color: '#007acc'}}>Pipeline Nodes</h3>
+            
+            {/* Data Processing Channel */}
+            <div style={{ marginBottom: '15px' }}>
+              <h4 style={{ 
+                margin: '5px', 
+                padding: '5px 8px', 
+                background: '#e3f2fd', 
+                borderLeft: '4px solid #1976d2',
+                fontSize: '12px',
+                color: '#1976d2',
+                fontWeight: 'bold'
+              }}>
+                DATA PROCESSING
+              </h4>
+              {Object.values(nodeMap)
+                .filter(n => 
+                  !n.label.includes('Source') && 
+                  !n.label.includes('Sink') && 
+                  !n.label.includes('Context') && 
+                  !n.label.includes('Rename') && 
+                  !n.label.includes('Delete')
+                )
+                .map(n => (
+                <div 
+                  key={n.id} 
+                  onClick={() => {
+                    setNodeInfo(n);
+                    setSelectedNodeId(String(n.id));
+                  }} 
+                  className={`node-item ${selectedNodeId === String(n.id) ? 'selected' : ''}`}
+                  style={{
+                    backgroundColor: selectedNodeId === String(n.id) ? '#bbdefb' : '#f0f8ff',
+                    borderLeftColor: '#1976d2'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{n.label}</div>
+                  <div style={{ fontSize: '11px', color: '#1976d2' }}>{n.component_type}</div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Context Processing Channel */}
+            <div style={{ marginBottom: '15px' }}>
+              <h4 style={{ 
+                margin: '5px', 
+                padding: '5px 8px', 
+                background: '#f3e5f5', 
+                borderLeft: '4px solid #7b1fa2',
+                fontSize: '12px',
+                color: '#7b1fa2',
+                fontWeight: 'bold'
+              }}>
+                CONTEXT PROCESSING
+              </h4>
+              {Object.values(nodeMap)
+                .filter(n => 
+                  n.label.includes('Context') || 
+                  n.label.includes('Rename') || 
+                  n.label.includes('Delete')
+                )
+                .map(n => (
+                <div 
+                  key={n.id} 
+                  onClick={() => {
+                    setNodeInfo(n);
+                    setSelectedNodeId(String(n.id));
+                  }} 
+                  className={`node-item ${selectedNodeId === String(n.id) ? 'selected' : ''}`}
+                  style={{
+                    backgroundColor: selectedNodeId === String(n.id) ? '#e1bee7' : '#faf8ff',
+                    borderLeftColor: '#7b1fa2'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{n.label}</div>
+                  <div style={{ fontSize: '11px', color: '#7b1fa2' }}>{n.component_type}</div>
+                </div>
+              ))}
+            </div>
+            
+            {/* I/O Nodes */}
+            <div style={{ marginBottom: '15px' }}>
+              <h4 style={{ 
+                margin: '5px', 
+                padding: '5px 8px', 
+                background: '#ffebee', 
+                borderLeft: '4px solid #d32f2f',
+                fontSize: '12px',
+                color: '#d32f2f',
+                fontWeight: 'bold'
+              }}>
+                INPUT/OUTPUT
+              </h4>
+              {Object.values(nodeMap)
+                .filter(n => 
+                  n.label.includes('Source') || 
+                  n.label.includes('Sink')
+                )
+                .map(n => (
+                <div 
+                  key={n.id} 
+                  onClick={() => {
+                    setNodeInfo(n);
+                    setSelectedNodeId(String(n.id));
+                  }} 
+                  className={`node-item ${selectedNodeId === String(n.id) ? 'selected' : ''}`}
+                  style={{
+                    backgroundColor: selectedNodeId === String(n.id) ? '#ffcdd2' : '#fff8f8',
+                    borderLeftColor: '#d32f2f'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{n.label}</div>
+                  <div style={{ fontSize: '11px', color: '#d32f2f' }}>{n.component_type}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div id="graph">
+            <div style={{ padding: '10px', borderBottom: '1px solid #ddd', background: '#f8f9fa' }}>
+              <h3 style={{ margin: '0', color: '#007acc' }}>Semantiva Dual-Channel Pipeline Visualization</h3>
+              <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}>
+                <span style={{ color: '#1976d2', fontWeight: 'bold' }}>Data Processing</span> • 
+                <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}> Context Processing</span> • 
+                <span style={{ color: '#d32f2f', fontWeight: 'bold' }}> I/O Operations</span> • 
+                {rfNodes.length} nodes • {rfEdges.length} connections
+              </p>
+            </div>
+            <CustomGraph 
+              nodes={rfNodes} 
+              edges={rfEdges} 
+              onNodeClick={onNodeClick}
+              selectedNodeId={selectedNodeId}
+            />
+          </div>
+          <div id="details">
+            {nodeInfo ? (
+              <div>
+                <h3 style={{ color: '#007acc', borderBottom: '2px solid #007acc', paddingBottom: '5px' }}>
+                  {nodeInfo.label}
+                </h3>
+                
+                {nodeInfo.docstring && (
+                  <div style={{ 
+                    marginBottom: '15px', 
+                    padding: '10px', 
+                    background: '#f0f8ff', 
+                    borderLeft: '4px solid #007acc',
+                    borderRadius: '4px',
+                    fontStyle: 'italic',
+                    fontSize: '14px',
+                    color: '#333'
+                  }}>
+                    {nodeInfo.docstring}
+                  </div>
+                )}
+                
+                {nodeInfo.input_type && (
+                  <div style={{ marginBottom: '10px', padding: '8px', background: '#e8f5e8', borderRadius: '4px' }}>
+                    <strong>Input Type:</strong> {nodeInfo.input_type}
+                  </div>
+                )}
+                
+                {nodeInfo.output_type && (
+                  <div style={{ marginBottom: '10px', padding: '8px', background: '#ffe8e8', borderRadius: '4px' }}>
+                    <strong>Output Type:</strong> {nodeInfo.output_type}
+                  </div>
+                )}
+                
+                <div style={{ marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '4px' }}>
+                  <strong>Type:</strong> {nodeInfo.component_type}
+                </div>
+                
+                <div style={{ marginBottom: '10px' }}>
+                  <p><b>Created Keys:</b> {nodeInfo.created_keys && nodeInfo.created_keys.length > 0 ? nodeInfo.created_keys.join(', ') : 'None'}</p>
+                  <p><b>Required Keys:</b> {nodeInfo.required_keys && nodeInfo.required_keys.length > 0 ? nodeInfo.required_keys.join(', ') : 'None'}</p>
+                  <p><b>Suppressed Keys:</b> {nodeInfo.suppressed_keys && nodeInfo.suppressed_keys.length > 0 ? nodeInfo.suppressed_keys.join(', ') : 'None'}</p>
+                </div>
+                
+                <div>
+                  <p><b>Parameters:</b></p>
+                  
+                  {nodeInfo.parameter_resolution && nodeInfo.parameter_resolution.required_params && 
+                   nodeInfo.parameter_resolution.required_params.length > 0 ? (
+                    <div>
+                      {/* Parameters from pipeline configuration */}
+                      <div style={{marginTop: '10px'}}>
+                        <p style={{margin: '0 0 5px 0', fontWeight: 'bold', color: '#1976d2'}}>From Pipeline Configuration:</p>
+                        {Object.keys(nodeInfo.parameter_resolution.from_pipeline_config || {}).length > 0 ? (
+                          <div style={{
+                            background: '#e3f2fd', 
+                            padding: '8px', 
+                            borderRadius: '4px',
+                            border: '1px solid #bbdefb',
+                            fontSize: '12px'
+                          }}>
+                            {Object.entries(nodeInfo.parameter_resolution.from_pipeline_config).map(([key, value]) => (
+                              <div key={key} style={{marginBottom: '3px'}}>
+                                <span style={{fontWeight: 'bold'}}>{key}:</span> {value}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            color: '#666',
+                            fontSize: '12px'
+                          }}>None</div>
+                        )}
+                      </div>
+                      
+                      {/* Parameters from context */}
+                      <div style={{marginTop: '10px'}}>
+                        <p style={{margin: '0 0 5px 0', fontWeight: 'bold', color: '#7b1fa2'}}>From Context:</p>
+                        {Object.keys(nodeInfo.parameter_resolution.from_context || {}).length > 0 ? (
+                          <div style={{
+                            background: '#f3e5f5', 
+                            padding: '8px', 
+                            borderRadius: '4px',
+                            border: '1px solid #e1bee7',
+                            fontSize: '12px'
+                          }}>
+                            {Object.entries(nodeInfo.parameter_resolution.from_context).map(([key, details]) => (
+                              <div key={key} style={{marginBottom: '3px'}}>
+                                <span style={{fontWeight: 'bold'}}>{key}:</span> {details.source !== "Initial Context" ? (
+                                  <span>From <span style={{color: '#7b1fa2', fontWeight: 'bold'}}>Node {details.source_idx}</span></span>
+                                ) : (
+                                  <span>From <span style={{color: '#d32f2f', fontWeight: 'bold'}}>Initial Context</span></span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{
+                            background: '#f8f9fa',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            color: '#666',
+                            fontSize: '12px'
+                          }}>None</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      background: '#f8f9fa', 
+                      padding: '8px', 
+                      borderRadius: '4px',
+                      color: '#666',
+                      fontSize: '12px'
+                    }}>
+                      This node does not require any parameters.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                <h4>Select a node to see details</h4>
+                <p>Click on any node in the graph or sidebar to view its properties, parameters, and relationships.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(React.createElement(App), document.getElementById('root'));

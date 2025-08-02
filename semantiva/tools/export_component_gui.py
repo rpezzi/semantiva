@@ -31,14 +31,29 @@ def main() -> None:
 
     data = build_component_json(args.ttl)
 
-    template_path = Path(__file__).parent / "web_gui" / "components.html"
+    template_dir = Path(__file__).parent / "web_gui"
+    template_path = template_dir / "components.html"
+    css_path = template_dir / "static" / "components.css"
+    js_path = template_dir / "static" / "components.js"
+
     html = template_path.read_text()
+    css = css_path.read_text()
+    js = js_path.read_text()
+
+    html = html.replace(
+        '<link rel="stylesheet" href="/static/components.css" />',
+        f"<style>\n{css}\n</style>",
+    )
+    html = html.replace(
+        '<script type="text/babel" src="/static/components.js"></script>',
+        f'<script type="text/babel">\n{js}\n</script>',
+    )
 
     injection = (
         "<script>\n"
         f"window.COMPONENT_DATA = {json.dumps(data)};\n"
         "window.fetch = ((orig) => (url, options) => {\n"
-        "  if (url === '/components') {\n"
+        "  if (url === '/api/components') {\n"
         "    return Promise.resolve({ok: true, json: () => Promise.resolve(window.COMPONENT_DATA)});\n"
         "  }\n"
         "  return orig(url, options);\n"

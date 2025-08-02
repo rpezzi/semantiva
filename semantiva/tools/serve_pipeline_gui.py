@@ -19,7 +19,7 @@ using the new modular inspection system. The server integrates with the inspecti
 module to provide consistent pipeline data representation across CLI and web interfaces.
 
 Key Features:
-- **Inspection Integration**: Uses `build_pipeline_inspection()` and `json_report()` 
+- **Inspection Integration**: Uses `build_pipeline_inspection()` and `json_report()`
   for consistent data generation
 - **Error Resilient**: Can visualize even invalid pipeline configurations
 - **Parameter Tracking**: Shows parameter resolution and context flow
@@ -69,8 +69,8 @@ def build_pipeline_json(pipeline: Pipeline) -> dict:
     return json_report(inspection)
 
 
-@app.get("/pipeline")
-def get_pipeline():
+@app.get("/api/pipeline")
+def get_pipeline_api():
     if not hasattr(app.state, "pipeline") or app.state.pipeline is None:
         raise HTTPException(
             status_code=404, detail="Pipeline not found. Please load a pipeline first."
@@ -78,14 +78,15 @@ def get_pipeline():
     return build_pipeline_json(app.state.pipeline)
 
 
+@app.get("/pipeline")
+def get_pipeline_legacy():
+    """Legacy endpoint retained for backward compatibility."""
+    return get_pipeline_api()
+
+
 @app.get("/")
 def index():
     return FileResponse(Path(__file__).parent / "web_gui" / "index.html")
-
-
-@app.get("/debug")
-def debug():
-    return FileResponse(Path(__file__).parent / "web_gui" / "debug.html")
 
 
 def main():
@@ -105,7 +106,7 @@ def main():
     print("-" * 40)
     print("Extended Pipeline Inspection:", extended_report(inspection))
 
-    static_dir = Path(__file__).parent / "web_gui"
+    static_dir = Path(__file__).parent / "web_gui" / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     import uvicorn

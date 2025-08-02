@@ -81,28 +81,28 @@ To quickly dive into Semantiva, explore the following resources:
 - **Extended Documentation:**
    Visit [docs.semantiva.org](https://docs.semantiva.org/) for comprehensive reference material on Semantiva's architecture, principles, and usage.
 
-- **Local Pipeline GUI:**
-  Visualize pipeline configurations in your browser by running:
-  ```bash
-  python serve_pipeline_gui.py path/to/pipeline.yaml
-  ```
-  Then open `http://127.0.0.1:8000` to explore the graph of nodes and view details on click.
-- **Export Standalone GUI:**
-  Generate a static HTML inspection page with:
-  ```bash
-  python export_pipeline_gui.py path/to/pipeline.yaml output.html
-  ```
-  The generated file can be hosted on GitHub Pages or any static site.
-- **Component Ontology GUI:**
-  Browse the full Semantiva component hierarchy by exporting the ontology and
-  opening the interactive viewer:
-  ```bash
-  python serve_component_gui.py semantiva_components.ttl
-  ```
-  Or generate a standalone page:
-  ```bash
-  python export_component_gui.py semantiva_components.ttl components.html
-  ```
+  - **Local Pipeline GUI:**
+    Visualize pipeline configurations in your browser by running:
+    ```bash
+    python semantiva/tools/serve_pipeline_gui.py path/to/pipeline.yaml --port 8000
+    ```
+    Then open `http://127.0.0.1:8000` to explore the graph of nodes and view details on click.
+  - **Export Standalone GUI:**
+    Generate a static HTML inspection page with:
+    ```bash
+    python semantiva/tools/export_pipeline_gui.py path/to/pipeline.yaml output.html
+    ```
+    The generated file can be hosted on GitHub Pages or any static site.
+  - **Component Ontology GUI:**
+    Browse the full Semantiva component hierarchy by exporting the ontology and
+    opening the interactive viewer:
+    ```bash
+    python semantiva/tools/serve_component_gui.py semantiva_components.ttl
+    ```
+    Or generate a standalone page:
+    ```bash
+    python semantiva/tools/export_component_gui.py semantiva_components.ttl components.html
+    ```
 
 
 These resources offer a practical roadmap to mastering the framework and leveraging its full potential in your projects.

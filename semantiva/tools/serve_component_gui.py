@@ -57,11 +57,17 @@ def build_component_json(ttl_path: str) -> Dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
-@app.get("/components")
-def get_components() -> Dict[str, Any]:
+@app.get("/api/components")
+def get_components_api() -> Dict[str, Any]:
     if not hasattr(app.state, "ttl_path"):
         raise HTTPException(status_code=404, detail="Ontology not loaded")
     return build_component_json(app.state.ttl_path)
+
+
+@app.get("/components")
+def get_components_legacy() -> Dict[str, Any]:
+    """Legacy endpoint retained for backward compatibility."""
+    return get_components_api()
 
 
 @app.get("/")
@@ -78,7 +84,7 @@ def main() -> None:
 
     app.state.ttl_path = args.ttl
 
-    static_dir = Path(__file__).parent / "web_gui"
+    static_dir = Path(__file__).parent / "web_gui" / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     import uvicorn

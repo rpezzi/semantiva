@@ -32,14 +32,29 @@ def main() -> None:
     pipeline = Pipeline(config)
     data = build_pipeline_json(pipeline)
 
-    template_path = Path(__file__).parent / "web_gui" / "index.html"
+    template_dir = Path(__file__).parent / "web_gui"
+    template_path = template_dir / "index.html"
+    css_path = template_dir / "static" / "pipeline.css"
+    js_path = template_dir / "static" / "pipeline.js"
+
     html = template_path.read_text()
+    css = css_path.read_text()
+    js = js_path.read_text()
+
+    html = html.replace(
+        '<link rel="stylesheet" href="/static/pipeline.css" />',
+        f"<style>\n{css}\n</style>",
+    )
+    html = html.replace(
+        '<script type="text/babel" src="/static/pipeline.js"></script>',
+        f'<script type="text/babel">\n{js}\n</script>',
+    )
 
     injection = (
         "<script>\n"
         f"window.PIPELINE_DATA = {json.dumps(data)};\n"
         "window.fetch = ((orig) => (url, options) => {\n"
-        "  if (url === '/pipeline') {\n"
+        "  if (url === '/api/pipeline') {\n"
         "    return Promise.resolve({ok: true, json: () => Promise.resolve(window.PIPELINE_DATA)});\n"
         "  }\n"
         "  return orig(url, options);\n"
