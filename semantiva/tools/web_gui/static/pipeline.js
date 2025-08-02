@@ -709,6 +709,11 @@
                 <span style={{ color: '#d32f2f', fontWeight: 'bold' }}> I/O Operations</span> • 
                 {rfNodes.length} nodes • {rfEdges.length} connections
               </p>
+              {pipelineInfo && pipelineInfo.required_context_keys && pipelineInfo.required_context_keys.length > 0 && (
+                <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#666' }}>
+                  <span style={{ fontWeight: 'bold' }}>Required context keys:</span> {pipelineInfo.required_context_keys.join(', ')}
+                </p>
+              )}
             </div>
             <CustomGraph 
               nodes={rfNodes} 

@@ -1,7 +1,14 @@
-    body, html { margin:0; height:100%; }
+body, html { margin:0; height:100%; }
     #root { display:flex; height:100%; width:100%; }
     #sidebar { width:400px; border-right:1px solid #ccc; overflow:auto; padding:4px; }
-    #details { width:300px; border-left:1px solid #ccc; overflow:auto; padding:20px; }
+    #details { 
+      width:300px; 
+      border-left:1px solid #ccc; 
+      overflow:auto; 
+      padding:20px; 
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
     #graph { flex:1; overflow: auto; position: relative; }
     pre { white-space:pre-wrap; }
     .node-item { 
@@ -11,6 +18,10 @@
       margin: 2px; 
       border-radius: 4px;
       background: #f9f9f9;
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
     }
     .node-item:hover { 
       background: #e9e9e9; 
@@ -319,4 +330,20 @@
       border-top: 5px solid transparent;
       border-bottom: 5px solid transparent;
       border-left: 5px solid #e8f5e8;
+    }
+
+    /* Text wrapping improvements for details panel */
+    #details h3 {
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+      line-height: 1.3;
+    }
+
+    /* Improve wrapping for long parameter names and values */
+    #details .parameter-content {
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
