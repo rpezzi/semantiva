@@ -1,4 +1,4 @@
-    const {useState, useEffect, useRef} = React;
+    const {useState, useEffect, useRef, useCallback} = React;
 
     // Individual node component with anchor placeholders
     function PipelineNode({ node, pos, isSelected, onClick, registerAnchors, width, height }) {
@@ -22,7 +22,7 @@
           node: rect
         };
         registerAnchors(node.id, anchors);
-      }, [node.id, node.data.contextParams.length]);
+      }, [node.id, node.data.contextParams.length, registerAnchors]);
 
       const paramCount = (node.data.pipelineConfigParams ? node.data.pipelineConfigParams.length : 0) || 0;
       const nodeWidthToUse = pos.type === 'source-sink' ? 450 : width;
@@ -99,9 +99,31 @@
               : 'I/O'}
           </div>
 
-          {/* Anchor elements */}
-          <div ref={el => (topRefs.current[0] = el)} className="anchor top" />
-          <div ref={el => (bottomRefs.current[0] = el)} className="anchor bottom" />
+          {/* Anchor elements - positioned at edge centers */}
+          <div 
+            ref={el => (topRefs.current[0] = el)} 
+            className="anchor top"
+            style={{
+              position: 'absolute',
+              top: '0px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '1px',
+              height: '1px'
+            }}
+          />
+          <div 
+            ref={el => (bottomRefs.current[0] = el)} 
+            className="anchor bottom"
+            style={{
+              position: 'absolute',
+              bottom: '0px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '1px',
+              height: '1px'
+            }}
+          />
           {[...Array(paramCount)].map((_, i) => (
             <div
               key={`l-${i}`}
@@ -116,6 +138,24 @@
                 key={param}
                 ref={el => (paramRightRefs.current[i] = el)}
                 className="param-label right-anchor"
+              >
+                {param}
+              </div>
+            ))}
+            {(node.data.createdKeys || []).map((key, i) => (
+              <div
+                key={key}
+                className="param-label created-key"
+              >
+                {key}
+              </div>
+            ))}
+          </div>
+          <div className="config-params">
+            {(node.data.pipelineConfigParams || []).map((param, i) => (
+              <div
+                key={param}
+                className="param-label left-anchor"
               >
                 {param}
               </div>
@@ -137,31 +177,47 @@
       const nodeHeight = 50;
       const verticalSpacing = 80;
 
-      const registerAnchors = (id, rects) => {
-        if (!containerRef) return;
+      const registerAnchors = useCallback((id, rects) => {
+        if (!containerRef) {
+          // Retry after a short delay if container ref is not ready
+          setTimeout(() => registerAnchors(id, rects), 10);
+          return;
+        }
         const containerRect = containerRef.getBoundingClientRect();
+        
+        // For top/bottom anchors, we want the center horizontally and the edge vertically
+        const convertTopBottom = r => ({
+          x: r.left + r.width / 2 - containerRect.left,
+          y: r.top + r.height / 2 - containerRect.top
+        });
+        
+        // For left/right anchors, use center point
         const convert = r => ({
           x: r.left + r.width / 2 - containerRect.left,
           y: r.top + r.height / 2 - containerRect.top
         });
+        
         const convertNode = r => ({
           x: r.left - containerRect.left,
           y: r.top - containerRect.top,
           width: r.width,
           height: r.height
         });
+        
         const convArr = arr => arr.map(convert);
+        const convTopBottomArr = arr => arr.map(convertTopBottom);
+        
         setAnchorMap(prev => ({
           ...prev,
           [id]: {
-            top: convArr(rects.top),
-            bottom: convArr(rects.bottom),
+            top: convTopBottomArr(rects.top),
+            bottom: convTopBottomArr(rects.bottom),
             left: convArr(rects.left),
             right: convArr(rects.right),
             node: convertNode(rects.node)
           }
         }));
-      };
+      }, [containerRef]);
       
       const handleZoomIn = () => {
         setZoomLevel(prev => Math.min(prev + 0.2, 2.0));
@@ -273,67 +329,113 @@
               paddingLeft: channelGap,
               paddingRight: channelGap
             }}>
-          {/* Channel backgrounds */}
-          <div className="channel-background config-channel" style={{ width: colWidths.config, left: channelGap }}>
+          {/* Channel backgrounds - rendered within transform scope */}
+          <div 
+            className="channel-background config-channel" 
+            style={{ 
+              position: 'absolute',
+              top: 10,
+              left: channelGap,
+              width: colWidths.config, 
+              height: totalHeight - 100,
+              background: '#eeeeee',
+              border: '2px dashed #cccccc',
+              borderRadius: '12px',
+              opacity: 0.3,
+              zIndex: 0
+            }}
+          >
             <div className="channel-label">Config</div>
           </div>
-          <div className="channel-background data-channel" style={{ left: colWidths.config + 2 * channelGap, width: colWidths.data }}>
+          <div 
+            className="channel-background data-channel" 
+            style={{ 
+              position: 'absolute',
+              top: 10,
+              left: colWidths.config + 2 * channelGap, 
+              width: colWidths.data,
+              height: totalHeight - 100,
+              background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+              border: '2px dashed #1976d2',
+              borderRadius: '12px',
+              opacity: 0.3,
+              zIndex: 0
+            }}
+          >
             <div className="channel-label">Data Channel</div>
           </div>
-          <div className="channel-background context-channel" style={{ left: colWidths.config + colWidths.data + 3 * channelGap, width: colWidths.context }}>
+          <div 
+            className="channel-background context-channel" 
+            style={{ 
+              position: 'absolute',
+              top: 10,
+              left: colWidths.config + colWidths.data + 3 * channelGap, 
+              width: colWidths.context,
+              height: totalHeight - 100,
+              background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+              border: '2px dashed #7b1fa2',
+              borderRadius: '12px',
+              opacity: 0.3,
+              zIndex: 0
+            }}
+          >
             <div className="channel-label">Context Channel</div>
           </div>
           
-          {/* Render edges (arrows) - Use single SVG for all arrows */}
-          <svg style={{ 
-            position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            width: '100%', 
-            height: '100%', 
-            zIndex: 5,
-            pointerEvents: 'none' 
-          }}>
+          {/* Render edges (arrows) - SVG with complete isolation */}
+          <svg 
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              width: `${totalWidth}px`, 
+              height: `${totalHeight}px`, 
+              zIndex: 10,
+              pointerEvents: 'none',
+              background: 'none',
+              backgroundColor: 'transparent',
+              border: 'none',
+              margin: 0,
+              padding: 0,
+              overflow: 'visible'
+            }}
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <defs>
-              <marker id="straight-arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#1976d2" />
-              </marker>
-              <marker id="straight-arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#7b1fa2" />
-              </marker>
-              <marker id="straight-arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#d32f2f" />
-              </marker>
-              <marker id="cross-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#ff6b6b" />
+              <marker id="arrow-black" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+                <polygon points="0 0, 6 2.5, 0 5" fill="#000000" />
               </marker>
             </defs>
             
             {edges.map(edge => {
               const sourcePos = nodePositions[edge.source];
               const targetPos = nodePositions[edge.target];
-              const sourceAnchors = anchorMap[edge.source];
-              const targetAnchors = anchorMap[edge.target];
-              if (!sourcePos || !targetPos || !sourceAnchors || !targetAnchors) return null;
+              
+              if (!sourcePos || !targetPos) return null;
 
-              const start = sourceAnchors.bottom[0];
-              const end = targetAnchors.top[0];
-
-              const arrowColor = sourcePos.type === 'data-processor' ? '#1976d2' :
-                               sourcePos.type === 'context-processor' ? '#7b1fa2' : '#d32f2f';
-              const markerId = sourcePos.type === 'data-processor' ? 'straight-arrow-blue' :
-                             sourcePos.type === 'context-processor' ? 'straight-arrow-purple' : 'straight-arrow-red';
+              // Calculate connection points directly from node positions
+              const sourceNodeWidth = sourcePos.type === 'source-sink' ? 450 : nodeWidth;
+              const targetNodeWidth = targetPos.type === 'source-sink' ? 450 : nodeWidth;
+              
+              // Start from bottom center of source node
+              const startX = sourcePos.x;
+              const startY = sourcePos.y + nodeHeight;
+              
+              // End at top center of target node  
+              const endX = targetPos.x;
+              const endY = targetPos.y;
 
               return (
                 <line
                   key={edge.id}
-                  x1={start.x}
-                  y1={start.y}
-                  x2={end.x}
-                  y2={end.y}
-                  stroke={arrowColor}
-                  strokeWidth="3"
-                  markerEnd={`url(#${markerId})`}
+                  x1={startX}
+                  y1={startY}
+                  x2={endX}
+                  y2={endY}
+                  stroke="#000000"
+                  strokeWidth="1.5"
+                  strokeDasharray="5,3"
+                  markerEnd="url(#arrow-black)"
                 />
               );
             })}
@@ -355,36 +457,6 @@
                 width={nodeWidth}
                 height={nodeHeight}
               />
-            );
-          })}
-
-          {/* Config parameter boxes */}
-          {nodes.map(node => {
-            const pos = nodePositions[node.id];
-            if (!pos) return null;
-            const items = node.data.pipelineConfigParams || [];
-            const text = items.join(', ');
-            return (
-              <div
-                key={"cfg-" + node.id}
-                onClick={() => onNodeClick(null, node)}
-                style={{
-                  position: 'absolute',
-                  left: channelGap,
-                  cursor: 'pointer',
-                  top: pos.y,
-                  width: colWidths.config,
-                  height: nodeHeight,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#eeeeee',
-                  border: items.length > 0 ? '1px solid #cccccc' : '1px dashed #cccccc',
-                  borderRadius: '6px',
-                  fontSize: '12px'
-                }}>
-                {text}
-              </div>
             );
           })}
         </div>
@@ -420,7 +492,8 @@
                 data: {
                   label: node.label + "\n" + (node.input_type || '') + (node.output_type ? ' → ' + node.output_type : ''),
                   pipelineConfigParams: node.pipelineConfigParams || [],
-                  contextParams: node.contextParams || []
+                  contextParams: node.contextParams || [],
+                  createdKeys: node.created_keys || []
                 },
                 position: { x: idx * 200, y: 100 },
                 type: 'default'

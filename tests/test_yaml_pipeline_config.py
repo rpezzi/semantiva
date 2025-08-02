@@ -55,13 +55,13 @@ def test_load_pipeline_from_yaml():
     # Verify context contains expected keys
     assert "final_value" in context.keys(), "Context should contain 'final_value'"
     assert (
-        "initial_debug" not in context.keys()
-    ), "Context should not contain deleted key 'initial_debug'"
+        "initial_float" not in context.keys()
+    ), "Context should not contain deleted key 'initial_float'"
 
     # Verify the mathematical pipeline progression
     # Starting value from FloatMockDataSource: 42.0
-    # FloatCollectValueProbe: collects 42.0 as "initial_debug"
-    # rename:initial_debug:addend: renames "initial_debug" to "addend" (value still 42.0)
+    # FloatCollectValueProbe: collects 42.0 as "initial_float"
+    # rename:initial_float:addend: renames "initial_float" to "addend" (value still 42.0)
     # After FloatMultiplyOperation (factor=2.5): 42.0 * 2.5 = 105.0
     # After FloatSquareOperation: 105.0 ** 2 = 11025.0
     # After FloatAddOperation (addend=42.0): 11025.0 + 42.0 = 11067.0

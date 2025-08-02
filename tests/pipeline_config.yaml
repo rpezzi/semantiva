@@ -3,16 +3,15 @@ pipeline:
     - processor: "FloatMockDataSource"
 
     - processor: "FloatCollectValueProbe"
-      context_keyword: "initial_debug"
-
-    - processor: "rename:initial_debug:addend"
-
+      context_keyword: "initial_float"
 
     - processor: "FloatMultiplyOperation"
       parameters:
         factor: 2.5
 
     - processor: "FloatSquareOperation"
+
+    - processor: "rename:initial_float:addend"
 
     - processor: "FloatAddOperation"
 
