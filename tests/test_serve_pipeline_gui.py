@@ -14,14 +14,9 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from pathlib import Path
-import tempfile
-import json
-import yaml
 
 from semantiva import Pipeline
 from semantiva.tools.serve_pipeline_gui import app, build_pipeline_json
-from semantiva.tools.pipeline_inspector import PipelineInspector
 from semantiva.examples.test_utils import FloatMultiplyOperation, FloatCollectValueProbe
 
 
@@ -49,8 +44,12 @@ def test_client(test_pipeline):
 
 
 def test_build_pipeline_json(test_pipeline):
-    """Test the build_pipeline_json function."""
-    # Get the pipeline JSON
+    """Test the build_pipeline_json function using the new inspection system.
+
+    This test validates that the web GUI integration properly uses the new
+    modular inspection system to generate JSON data for pipeline visualization.
+    """
+    # Get the pipeline JSON (now generated via inspection system)
     pipeline_json = build_pipeline_json(test_pipeline)
 
     # Check basic structure

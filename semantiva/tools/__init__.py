@@ -12,8 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .pipeline_inspector import PipelineInspector
-
-__all__ = [
-    "PipelineInspector",
-]
+__all__: list[str] = []
