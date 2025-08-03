@@ -342,7 +342,7 @@
               background: '#eeeeee',
               border: '2px dashed #cccccc',
               borderRadius: '12px',
-              opacity: 0.3,
+              opacity: 0.6,
               zIndex: 0
             }}
           >
@@ -359,7 +359,7 @@
               background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
               border: '2px dashed #1976d2',
               borderRadius: '12px',
-              opacity: 0.3,
+              opacity: 0.6,
               zIndex: 0
             }}
           >
@@ -376,7 +376,7 @@
               background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
               border: '2px dashed #7b1fa2',
               borderRadius: '12px',
-              opacity: 0.3,
+              opacity: 0.6,
               zIndex: 0
             }}
           >
@@ -483,6 +483,7 @@
       const [error, setError] = useState(null);
       const [loading, setLoading] = useState(true);
       const [selectedNodeId, setSelectedNodeId] = useState(null);
+      const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
       useEffect(() => {
         console.log('Loading pipeline data...');
@@ -567,11 +568,33 @@
 
       return (
         <div style={{display:'flex', height:'100%', width:'100%'}}>
-          <div id="sidebar">
-            <h3 style={{margin:'10px 5px', color: '#007acc'}}>Pipeline Nodes</h3>
+          <div id="sidebar" style={{ 
+            width: sidebarCollapsed ? '40px' : '400px', 
+            overflow: 'hidden', 
+            transition: 'width 0.3s ease',
+            borderRight: '1px solid #ccc',
+            padding: sidebarCollapsed ? '4px 0' : '4px'
+          }}>
+            <h3 
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                margin: '10px 5px', 
+                color: '#007acc',
+                cursor: 'pointer',
+                writingMode: sidebarCollapsed ? 'vertical-rl' : 'horizontal-tb',
+                textAlign: 'center',
+                transform: sidebarCollapsed ? 'rotate(180deg)' : 'none',
+                whiteSpace: 'nowrap',
+                userSelect: 'none'
+              }}
+            >
+              Pipeline Node List
+            </h3>
             
-            {/* Data Processing Channel */}
-            <div style={{ marginBottom: '15px' }}>
+            {!sidebarCollapsed && (
+              <div>
+                {/* Data Processing Channel */}
+                <div style={{ marginBottom: '15px' }}>
               <h4 style={{ 
                 margin: '5px', 
                 padding: '5px 8px', 
@@ -684,11 +707,13 @@
                 </div>
               ))}
             </div>
+              </div>
+            )}
           </div>
           <div id="graph">
             <div style={{ padding: '10px', borderBottom: '1px solid #ddd', background: '#f8f9fa' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h3 style={{ margin: '0', color: '#007acc' }}>Semantiva Dual-Channel Pipeline Visualization</h3>
+                <h3 style={{ margin: '0', color: '#007acc' }}>Semantiva Studio Lite - Dual-Channel Pipeline Inspection</h3>
                 {pipelineInfo && pipelineInfo.has_errors && (
                   <span style={{ 
                     color: '#dc3545', 
@@ -704,9 +729,6 @@
                 )}
               </div>
               <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#666' }}>
-                <span style={{ color: '#1976d2', fontWeight: 'bold' }}>Data Processing</span> • 
-                <span style={{ color: '#7b1fa2', fontWeight: 'bold' }}> Context Processing</span> • 
-                <span style={{ color: '#d32f2f', fontWeight: 'bold' }}> I/O Operations</span> • 
                 {rfNodes.length} nodes • {rfEdges.length} connections
               </p>
               {pipelineInfo && pipelineInfo.required_context_keys && pipelineInfo.required_context_keys.length > 0 && (
