@@ -1,0 +1,5 @@
+pipeline:
+  nodes:
+    - processor: Slicer:FloatCollectValueProbe:FloatDataCollection
+      context_keyword: slice_values
+    - processor: rename:slice_values:all_slices

@@ -1,0 +1,5 @@
+pipeline:
+  nodes:
+    - processor: FloatMultiplyOperation
+      # ← whoops: no 'factor'
+    - processor: FloatPayloadSink

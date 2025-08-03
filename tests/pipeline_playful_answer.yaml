@@ -1,0 +1,6 @@
+pipeline:
+  nodes:
+    - processor: FloatMockDataSource
+    - processor: FloatCollectValueProbe
+      context_keyword: answer
+    - processor: rename:answer:the_answer_to_everything
