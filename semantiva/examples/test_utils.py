@@ -17,7 +17,8 @@ from semantiva.data_types import BaseDataType, DataCollectionType
 from semantiva.data_processors import DataOperation, DataProbe
 from semantiva.data_io import DataSource, PayloadSource, DataSink, PayloadSink
 from semantiva.pipeline import Payload
-
+from typing import Optional
+from semantiva.logger import Logger
 from semantiva.context_processors import ContextType
 
 
@@ -26,6 +27,17 @@ class FloatDataType(BaseDataType[float]):
     """A simple data type that holds a float value."""
 
     def validate(self, data: float) -> bool:
+        """Check that ``data`` is a ``float``.
+
+        Args:
+            data: Value to validate.
+
+        Returns:
+            bool: ``True`` if the value is a float.
+
+        Raises:
+            TypeError: If ``data`` is not a float.
+        """
         if not isinstance(data, float):
             raise TypeError("Data must be a float")
         return True
@@ -43,6 +55,14 @@ class FloatDataCollection(DataCollectionType[FloatDataType, list]):
         return iter(self._data)
 
     def append(self, item: FloatDataType) -> None:
+        """Append a FloatDataType item to the collection.
+
+        Args:
+            item (FloatDataType): The element to add to the collection.
+
+        Raises:
+            TypeError: If ``item`` is not a ``FloatDataType`` instance.
+        """
         if not isinstance(item, FloatDataType):
             raise TypeError("Item must be of type FloatDataType")
         self._data.append(item)
@@ -51,6 +71,14 @@ class FloatDataCollection(DataCollectionType[FloatDataType, list]):
         return len(self._data)
 
     def validate(self, data):
+        """Validate that all items in the collection are FloatDataType instances.
+
+        Args:
+            data (Iterable): The collection to validate.
+
+        Raises:
+            TypeError: If any element is not a ``FloatDataType`` instance.
+        """
         for item in data:
             if not isinstance(item, FloatDataType):
                 raise TypeError("Data must be a list of FloatDataType objects")
@@ -62,10 +90,12 @@ class FloatOperation(DataOperation):
 
     @classmethod
     def input_data_type(cls):
+        """Return the expected input data type."""
         return FloatDataType
 
     @classmethod
     def output_data_type(cls):
+        """Return the produced output data type."""
         return FloatDataType
 
 
@@ -74,10 +104,12 @@ class FloatCollectionMergeOperation(DataOperation):
 
     @classmethod
     def input_data_type(cls):
+        """Return the expected collection input type."""
         return FloatDataCollection
 
     @classmethod
     def output_data_type(cls):
+        """Return the merged output data type."""
         return FloatDataType
 
 
@@ -87,6 +119,7 @@ class FloatProbe(DataProbe):
 
     @classmethod
     def input_data_type(cls):
+        """Return the expected input data type for the probe."""
         return FloatDataType
 
 
@@ -149,14 +182,14 @@ class FloatBasicProbe(FloatProbe):
 
 
 class FloatCollectionSumOperation(FloatCollectionMergeOperation):
-    """Sum all FloatDataType items in a FloatDataCollection."""
+    """Sum all items in a FloatDataCollection."""
 
     def _process_logic(self, data, *args, **kwargs):
         return FloatDataType(sum(item.data for item in data.data))
 
 
 class FloatCollectValueProbe(FloatProbe):
-    """Collect the value of the input."""
+    """A probe that collects the value of the input."""
 
     def _process_logic(self, data, *args, **kwargs):
         return data.data
@@ -171,17 +204,19 @@ class FloatMockDataSource(DataSource):
 
     @classmethod
     def output_data_type(cls):
+        """Return the data type produced by this source."""
         return FloatDataType
 
 
 class FloatMockDataSink(DataSink):
-    """A Mock Datasink for FloatDataType data."""
+    """A Mock Datasink for FloatDataType data that does nothing."""
 
     def _send_data(self, data: BaseDataType, path: str, *args, **kwargs):
         return
 
     @classmethod
     def input_data_type(cls):
+        """Return the data type accepted by this sink."""
         return FloatDataType
 
 
@@ -192,8 +227,7 @@ class FloatMockDataSink(DataSink):
 
 class FloatDataSource(DataSource):
     """
-    Concrete implementation of DataSource
-    providing FloatDataType data.
+    A DataSource that outputs 123.0 as a FloatDataType.
     """
 
     @classmethod
@@ -203,14 +237,13 @@ class FloatDataSource(DataSource):
 
     @classmethod
     def output_data_type(cls):
-        # Return the type of data we are providing
+        """Return the type of data provided by the source."""
         return FloatDataType
 
 
 class FloatPayloadSource(PayloadSource):
     """
-    Concrete implementation of PayloadSource
-    providing (FloatDataType, ContextType) as payload.
+    A PayloadSource for FloatDataType that provides 456.0 and an empty context as payload.
     """
 
     def _get_payload(self, *args, **kwargs) -> Payload:
@@ -219,7 +252,7 @@ class FloatPayloadSource(PayloadSource):
 
     @classmethod
     def output_data_type(cls):
-        # Return the type of data in the payload
+        """Return the data type contained in the payload."""
         return FloatDataType
 
     @classmethod
@@ -230,12 +263,12 @@ class FloatPayloadSource(PayloadSource):
 
 class FloatDataSink(DataSink[FloatDataType]):
     """
-    Concrete implementation of DataSink
-    accepting FloatDataType data.
+    A DataSink for FloatDataType that simply stores the last data sent.
     """
 
-    def __init__(self):
-        self.last_data_sent = None
+    def __init__(self, logger: Optional[Logger] = None):
+        super().__init__(logger)
+        self.last_data_sent: Optional[FloatDataType] = None
 
     def _send_data(self, data: FloatDataType, *args, **kwargs):
         # Keep track of the last data we received
@@ -243,19 +276,19 @@ class FloatDataSink(DataSink[FloatDataType]):
 
     @classmethod
     def input_data_type(cls):
-        # Return the type of data we accept
+        """Return the data type accepted by this sink."""
         return FloatDataType
 
 
 class FloatPayloadSink(PayloadSink[FloatDataType]):
     """
-    Concrete implementation of PayloadSink
-    accepting (FloatDataType, ContextType).
+    A PayloadSink for FloatDataType that simply stores the last payload and context received.
     """
 
-    def __init__(self):
-        self.last_payload = None
-        self.last_context = None
+    def __init__(self, logger: Optional[Logger] = None):
+        super().__init__(logger)
+        self.last_payload: Optional[BaseDataType] = None
+        self.last_context: Optional[ContextType] = None
 
     def _send_payload(self, payload: Payload, *args, **kwargs):
         # Store the payload for inspection
@@ -264,5 +297,5 @@ class FloatPayloadSink(PayloadSink[FloatDataType]):
 
     @classmethod
     def input_data_type(cls):
-        # Return the type of data we accept
+        """Return the data type accepted by this payload sink."""
         return FloatDataType
