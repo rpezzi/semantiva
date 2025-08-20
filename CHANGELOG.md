@@ -32,10 +32,16 @@ Here is the updated changelog with the missing items included and the requested 
   - Added package `registry` to gather plugin and class/module registry.
   - Added file `semantiva/context_processors/factory.py` for context renamer and deleter factories
   - Pluggable class name resolvers in `ClassRegistry` with built-in support for `slicer:` YAML prefixes.
-  - Pluggable parameter resolvers via `ClassRegistry.register_param_resolver` with built-in
+- Pluggable parameter resolvers via `ClassRegistry.register_param_resolver` with built-in
     support for a ``model:`` prefix to instantiate fitting models from YAML
     pipeline definitions
+- Introduced metadata and node interface contract tests to enforce component expectations
+- **Documentation**: Added a docstring audit to the documentation build to track coverage
 
+- Introduced `semantiva` command-line interface with a `run` subcommand for executing pipeline YAML files
+- New CLI capabilities:
+  - `inspect` subcommand for summary or extended pipeline reports
+  - `--context` flag on `run` for injecting initial context key–value pairs
 ### Changed
 - **Refactored Pipeline Introspection System**: Replaced `PipelineInspector` with modular inspection architecture
   - **New Inspection Module** (`semantiva.inspection`): Introduces builder/reporter/validator separation of concerns
@@ -45,6 +51,7 @@ Here is the updated changelog with the missing items included and the requested 
   - **Multiple Report Formats**: Unified data drives `summary_report()`, `extended_report()`, `json_report()`, and `parameter_resolutions()`
   - **Invalid Configuration Support**: Can inspect and analyze partially valid or completely invalid pipeline configurations
   - **Post-Inspection Validation**: New `validate_pipeline()` function operates on inspection data, enabling validation as separate step
+- Moved `ModelFittingContextProcessor` from `semantiva/context_processors` to `semantiva/workflows` to separate generic context-processor logic from domain-specific workflows.
 - Renamed specialization API to extension API:
   - `load_specializations()` → `load_extensions()`
   - `SemantivaSpecialization` → `SemantivaExtension`
@@ -90,6 +97,12 @@ Here is the updated changelog with the missing items included and the requested 
   - File `Semantiva/specializations/specialization_loader.py` → `semantiva/registry/plugin_registry.py`
   - File `Semantiva/component_loader/component_loader.py` → `semantiva/registry/class_registry.py`
   - Moved `context_renamer_factory` and `context_deleter_factory` functions from `component_loader.py` to `context_processor/factory.py`
+- Centralized logger initialization in `_SemantivaComponent` and updated subclasses to call `super().__init__(logger)`
+  - Factory propagation fixes: pipeline node factories were updated to forward explicit `Logger` instances to all generated node types (including `DataSink` / `PayloadSink`) so node and wrapped processor share the same logger instance.
+- Payload processing ergonomics: `_PayloadProcessor.process()` now normalizes `None` into a `NoDataType()` instance when the expected input type is `NoDataType`, simplifying callers and tests.
+- Logger pickling behavior: `Logger` persists an explicit `name` attribute and restores the underlying stdlib logger by name during unpickling so roundtrips preserve configured identity and level.
+- Updated docstrings for `load_pipeline_from_yaml`, `_PayloadProcessor.process`, and `FloatDataType` to reflect their current signatures and return types
+
 
 ### Removed
 - Deleted legacy `payload_operations/` and `execution_tools/` directories

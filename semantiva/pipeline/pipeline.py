@@ -12,17 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List
-from semantiva.exceptions import (
-    PipelineTopologyError,
-)
+from typing import Any, Dict, List, Optional
 from .payload import Payload
 from semantiva.logger import Logger
 from .payload_processors import _PayloadProcessor
 from .nodes._pipeline_node_factory import _pipeline_node_factory
 from .nodes.nodes import (
     _PipelineNode,
-    _ContextProcessorNode,
     _ProbeResultCollectorNode,
 )
 from semantiva.execution.transport import (
@@ -44,18 +40,18 @@ class Pipeline(_PayloadProcessor):
     def __init__(
         self,
         pipeline_configuration: List[Dict],
-        logger: Logger | None = None,
-        transport: SemantivaTransport | None = None,
-        orchestrator: SemantivaOrchestrator | None = None,
+        logger: Optional[Logger] = None,
+        transport: Optional[SemantivaTransport] = None,
+        orchestrator: Optional[SemantivaOrchestrator] = None,
     ):
         """
         Initializes the pipeline with the given configuration, logger, transport, and orchestrator.
         Args:
             pipeline_configuration (List[Dict]): A list of dictionaries containing the pipeline configuration.
-            logger (Logger | None, optional): An optional logger instance for logging information. Defaults to None.
-            transport (SemantivaTransport | None, optional): An optional transport mechanism for the pipeline.
+            logger (Optional[Logger], optional): An optional logger instance for logging information. Defaults to None.
+            transport (Optional[SemantivaTransport], optional): An optional transport mechanism for the pipeline.
                 If not provided, an InMemorySemantivaTransport instance will be used. Defaults to None.
-            orchestrator (SemantivaOrchestrator | None, optional): An optional orchestrator for managing pipeline execution.
+            orchestrator (Optional[SemantivaOrchestrator], optional): An optional orchestrator for managing pipeline execution.
                 If not provided, a LocalSemantivaOrchestrator instance will be used. Defaults to None.
         Attributes:
             pipeline_configuration (List[Dict]): Stores the pipeline configuration.
@@ -77,7 +73,7 @@ class Pipeline(_PayloadProcessor):
 
         self.nodes = self._initialize_nodes()  # existing initialization logic
         if self.logger:
-            self.logger.info(f"Initialized {self.__class__.__name__}")
+            self.logger.debug(f"Initialized {self.__class__.__name__}")
 
     def _process(self, payload: Payload) -> Payload:
         """
@@ -93,7 +89,7 @@ class Pipeline(_PayloadProcessor):
             - Info: Logs the start and completion of the pipeline processing.
             - Debug: Logs a detailed timing report of the pipeline execution.
         """
-        self.logger.info("Start processing pipeline")
+        self.logger.info("Starting pipeline with %s nodes", len(self.nodes))
         self.stop_watch.start()  # existing pipeline timer start
 
         result_payload = self.orchestrator.execute(
@@ -105,8 +101,8 @@ class Pipeline(_PayloadProcessor):
 
         self.stop_watch.stop()  # existing pipeline timer stop
         self.logger.info("Pipeline execution complete.")
-        self.logger.debug(
-            "Pipeline execution timing report: \n\tPipeline %s\n%s",
+        self.logger.info(
+            "Pipeline execution report:\n\n\tPipeline %s\n%s\n",
             str(self.stop_watch),
             self.get_timers(),
         )
@@ -176,7 +172,7 @@ class Pipeline(_PayloadProcessor):
 
         for index, node_config in enumerate(self.pipeline_configuration, start=1):
             node = _pipeline_node_factory(node_config, self.logger)
-            self.logger.info(f"Initialized Node {index}: {type(node).__name__}")
+            self.logger.debug(f"Initialized Node {index}: {type(node).__name__}")
             nodes.append(node)
 
         return nodes

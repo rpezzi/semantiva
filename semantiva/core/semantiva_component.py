@@ -13,7 +13,18 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Dict, Any, Callable, List, Tuple, Type, get_origin, get_args
+from typing import (
+    Dict,
+    Any,
+    Callable,
+    List,
+    Tuple,
+    Type,
+    Optional,
+    get_origin,
+    get_args,
+    TYPE_CHECKING,
+)
 from abc import abstractmethod
 import textwrap
 import threading
@@ -21,8 +32,11 @@ import inspect
 import types
 import typing
 
+if TYPE_CHECKING:
+    from semantiva.logger import Logger
 
-# A thread‑safe registry mapping category names to component classes
+
+# A thread-safe registry mapping category names to component classes
 _COMPONENT_REGISTRY: Dict[str, List[Type[_SemantivaComponent]]] = {}
 _REGISTRY_LOCK = threading.Lock()
 
@@ -72,6 +86,20 @@ class _SemantivaComponent(metaclass=_SemantivaComponentMeta):
     - _define_metadata() -> Dict[str, Any]: Must be implemented by subclasses to define
                                            component-specific metadata.
     """
+
+    def __init__(self, logger: Optional["Logger"] = None) -> None:
+        """Initialize the component with an optional :class:`Logger`.
+
+        Subclasses should call ``super().__init__(logger)`` to ensure
+        consistent logger behavior. When ``logger`` is ``None`` a new
+        :class:`Logger` instance is created. An explicit ``None`` check
+        avoids overwriting falsy but valid objects.
+        """
+
+        # Import locally to avoid circular dependencies
+        from semantiva.logger import Logger
+
+        self.logger: "Logger" = logger if logger is not None else Logger()
 
     @classmethod
     def get_metadata(cls) -> Dict[str, Any]:
