@@ -12,19 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List
-from semantiva.exceptions import (
-    PipelineTopologyError,
-)
+from typing import Any, Dict, List, Optional
 from .payload import Payload
 from semantiva.logger import Logger
 from .payload_processors import _PayloadProcessor
-from .nodes._pipeline_node_factory import _pipeline_node_factory
 from .nodes.nodes import (
     _PipelineNode,
-    _ContextProcessorNode,
     _ProbeResultCollectorNode,
 )
+from .graph_builder import build_canonical_spec
 from semantiva.execution.transport import (
     SemantivaTransport,
     InMemorySemantivaTransport,
@@ -33,6 +29,7 @@ from semantiva.execution.orchestrator.orchestrator import (
     SemantivaOrchestrator,
     LocalSemantivaOrchestrator,
 )
+from semantiva.trace.model import TraceDriver
 
 
 class Pipeline(_PayloadProcessor):
@@ -44,19 +41,22 @@ class Pipeline(_PayloadProcessor):
     def __init__(
         self,
         pipeline_configuration: List[Dict],
-        logger: Logger | None = None,
-        transport: SemantivaTransport | None = None,
-        orchestrator: SemantivaOrchestrator | None = None,
+        logger: Optional[Logger] = None,
+        transport: Optional[SemantivaTransport] = None,
+        orchestrator: Optional[SemantivaOrchestrator] = None,
+        trace: Optional[TraceDriver] = None,
     ):
         """
         Initializes the pipeline with the given configuration, logger, transport, and orchestrator.
         Args:
             pipeline_configuration (List[Dict]): A list of dictionaries containing the pipeline configuration.
-            logger (Logger | None, optional): An optional logger instance for logging information. Defaults to None.
-            transport (SemantivaTransport | None, optional): An optional transport mechanism for the pipeline.
+            logger (Optional[Logger], optional): An optional logger instance for logging information. Defaults to None.
+            transport (Optional[SemantivaTransport], optional): An optional transport mechanism for the pipeline.
                 If not provided, an InMemorySemantivaTransport instance will be used. Defaults to None.
-            orchestrator (SemantivaOrchestrator | None, optional): An optional orchestrator for managing pipeline execution.
+            orchestrator (Optional[SemantivaOrchestrator], optional): An optional orchestrator for managing pipeline execution.
                 If not provided, a LocalSemantivaOrchestrator instance will be used. Defaults to None.
+            trace (Optional[TraceDriver], optional): An optional trace driver for capturing execution events.
+                When provided, captures complete execution records including error events with timing data.
         Attributes:
             pipeline_configuration (List[Dict]): Stores the pipeline configuration.
             transport (SemantivaTransport): The transport mechanism used by the pipeline.
@@ -68,16 +68,16 @@ class Pipeline(_PayloadProcessor):
         self.pipeline_configuration = pipeline_configuration
         self.transport = transport or InMemorySemantivaTransport()
         self.orchestrator = orchestrator or LocalSemantivaOrchestrator()
+        self.trace = trace
 
-        # Use inspection system for validation
-        from semantiva.inspection import build_pipeline_inspection, validate_pipeline
+        # Precompute canonical spec and resolved descriptors for validation
+        canonical, resolved = build_canonical_spec(pipeline_configuration)
+        self.canonical_spec = canonical
+        self.resolved_spec = resolved
 
-        inspection = build_pipeline_inspection(pipeline_configuration)
-        validate_pipeline(inspection)  # This will raise if there are any errors
-
-        self.nodes = self._initialize_nodes()  # existing initialization logic
+        self.nodes = []
         if self.logger:
-            self.logger.info(f"Initialized {self.__class__.__name__}")
+            self.logger.debug(f"Initialized {self.__class__.__name__}")
 
     def _process(self, payload: Payload) -> Payload:
         """
@@ -93,20 +93,24 @@ class Pipeline(_PayloadProcessor):
             - Info: Logs the start and completion of the pipeline processing.
             - Debug: Logs a detailed timing report of the pipeline execution.
         """
-        self.logger.info("Start processing pipeline")
+        self.logger.info("Starting pipeline with %s nodes", len(self.nodes))
         self.stop_watch.start()  # existing pipeline timer start
 
         result_payload = self.orchestrator.execute(
-            nodes=self.nodes,
+            pipeline_spec=self.resolved_spec,
             payload=payload,
             transport=self.transport,
             logger=self.logger,
+            trace=self.trace,
+            canonical_spec=self.canonical_spec,
         )
+
+        self.nodes = self.orchestrator.last_nodes
 
         self.stop_watch.stop()  # existing pipeline timer stop
         self.logger.info("Pipeline execution complete.")
-        self.logger.debug(
-            "Pipeline execution timing report: \n\tPipeline %s\n%s",
+        self.logger.info(
+            "Pipeline execution report:\n\n\tPipeline %s\n%s\n",
             str(self.stop_watch),
             self.get_timers(),
         )
@@ -162,24 +166,6 @@ class Pipeline(_PayloadProcessor):
 
         # Return the dictionary of probe results
         return probe_results
-
-    def _initialize_nodes(self):
-        """
-        Initialize all nodes in the pipeline.
-
-        This method uses the `_pipeline_node_factory` function to create nodes from the provided
-        pipeline configuration. Each node is then added to the pipeline.
-
-        Note: Validation is now handled by the inspection system before this method is called.
-        """
-        nodes = []
-
-        for index, node_config in enumerate(self.pipeline_configuration, start=1):
-            node = _pipeline_node_factory(node_config, self.logger)
-            self.logger.info(f"Initialized Node {index}: {type(node).__name__}")
-            nodes.append(node)
-
-        return nodes
 
     @classmethod
     def _define_metadata(cls) -> Dict[str, Any]:

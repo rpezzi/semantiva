@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Logging utilities for Semantiva.
+
+All `_SemantivaComponent` subclasses accept an optional ``logger`` argument. When
+omitted, a new :class:`Logger` from this module is created automatically.
+"""
+
 import sys
 import logging
 from typing import Optional
@@ -95,6 +101,7 @@ class Logger:
             self.logger = logging.getLogger(name)
         else:
             self.logger = logger
+        self.name = name
 
         # If the Logger class has not been initialized yet, set default values.
         # This ensures that the default log level and console output are only set once.
@@ -131,11 +138,12 @@ class Logger:
             return
         previous_level = self.logger.level
         self.logger.setLevel(self.verbosity_map[verbosity_level])
-        self.logger.info(
-            "Logger verbosity level changed from %s to %s.",
-            logging.getLevelName(previous_level),
-            verbosity_level,
-        )
+        if previous_level != self.logger.level:
+            self.logger.info(
+                "Logger verbosity level changed from %s to %s.",
+                logging.getLevelName(previous_level),
+                verbosity_level,
+            )
 
     def set_console_output(self, enable=True) -> None:
         """

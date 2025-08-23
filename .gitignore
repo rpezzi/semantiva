@@ -2,3 +2,6 @@ __pycache__
 *.pyc
 logs
 version.txt
+launch.json
+docs/build
+*.log

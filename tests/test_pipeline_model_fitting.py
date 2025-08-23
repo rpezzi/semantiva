@@ -15,18 +15,12 @@
 from semantiva import Pipeline, Payload, load_pipeline_from_yaml
 from semantiva.context_processors.context_types import ContextType
 from semantiva.data_types import NoDataType
-from semantiva.workflows.fitting_model import PolynomialFittingModel
-from semantiva.context_processors.context_processors import ModelFittingContextProcessor
+from semantiva.workflows import ModelFittingContextProcessor, PolynomialFittingModel
 
 
 def test_pipeline_model_fitting_from_yaml():
     nodes = load_pipeline_from_yaml("tests/pipeline_model_fitting.yaml")
     pipeline = Pipeline(nodes)
-
-    node = pipeline.nodes[0]
-    assert isinstance(node.processor, ModelFittingContextProcessor)
-    assert isinstance(node.processor.fitting_model, PolynomialFittingModel)
-    assert node.processor.fitting_model.degree == 2
 
     context = ContextType(
         {
@@ -36,4 +30,9 @@ def test_pipeline_model_fitting_from_yaml():
     )
     payload = Payload(NoDataType(), context)
     result = pipeline.process(payload)
+
+    node = pipeline.nodes[0]
+    assert isinstance(node.processor, ModelFittingContextProcessor)
+    assert isinstance(node.processor.fitting_model, PolynomialFittingModel)
+    assert node.processor.fitting_model.degree == 2
     assert "fit_coefficients" in result.context.keys()

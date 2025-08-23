@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import pytest
-from semantiva.data_processors.data_slicer_factory import Slicer
+from semantiva.data_processors.data_slicer_factory import slicer
 from semantiva.context_processors.context_types import (
     ContextType,
     ContextCollectionType,
 )
-from semantiva.exceptions import PipelineConfigurationError
 from semantiva.pipeline import Pipeline, Payload
 from semantiva.examples.test_utils import (
     FloatDataType,
@@ -119,14 +118,14 @@ def test_pipeline_execution_with_single_context(float_data_collection, empty_con
     # Define node configurations
     node_configurations = [
         {
-            "processor": Slicer(FloatCollectValueProbe, FloatDataCollection),
+            "processor": slicer(FloatCollectValueProbe, FloatDataCollection),
             "context_keyword": "mock_keyword",
         },
         {
-            "processor": Slicer(FloatCollectValueProbe, FloatDataCollection),
+            "processor": slicer(FloatCollectValueProbe, FloatDataCollection),
         },
         {
-            "processor": Slicer(FloatMultiplyOperation, FloatDataCollection),
+            "processor": slicer(FloatMultiplyOperation, FloatDataCollection),
             "parameters": {"factor": 2},
         },
     ]
@@ -164,14 +163,14 @@ def test_pipeline_execution_inverted_order(float_data_collection, empty_context)
     # Define node configurations
     node_configurations = [
         {
-            "processor": Slicer(FloatMultiplyOperation, FloatDataCollection),
+            "processor": slicer(FloatMultiplyOperation, FloatDataCollection),
             "parameters": {"factor": 2},
         },
         {
-            "processor": Slicer(FloatCollectValueProbe, FloatDataCollection),
+            "processor": slicer(FloatCollectValueProbe, FloatDataCollection),
         },
         {
-            "processor": Slicer(FloatCollectValueProbe, FloatDataCollection),
+            "processor": slicer(FloatCollectValueProbe, FloatDataCollection),
             "context_keyword": "mock_keyword",
         },
         {
@@ -213,15 +212,15 @@ def test_pipeline_slicing_with_context_collection(
     # Define node configurations
     node_configurations = [
         {
-            "processor": Slicer(FloatMultiplyOperation, FloatDataCollection),
+            "processor": slicer(FloatMultiplyOperation, FloatDataCollection),
             "parameters": {"factor": 2},
         },
         {
-            "processor": Slicer(FloatCollectValueProbe, FloatDataCollection),
+            "processor": slicer(FloatCollectValueProbe, FloatDataCollection),
             "context_keyword": "mock_keyword",
         },
         {
-            "processor": Slicer(FloatCollectValueProbe, FloatDataCollection),
+            "processor": slicer(FloatCollectValueProbe, FloatDataCollection),
         },
     ]
 
@@ -261,19 +260,19 @@ pipeline:
 
     pipeline = Pipeline(node_configs)
 
+    payload = pipeline.process(Payload(float_data_collection, empty_context))
+
     assert (
         pipeline.nodes[0].processor.__class__.__name__
         == "SlicerForFloatMultiplyOperation"
     )
-
-    payload = pipeline.process(Payload(float_data_collection, empty_context))
     data, _ = payload.data, payload.context
 
     assert isinstance(data, FloatDataCollection)
     assert [item.data for item in data] == [2.0, 4.0, 6.0]
 
 
-def test_image_pipeline_invalid_configuration():
+def test_image_pipeline_invalid_configuration(empty_context):
     """
     Test that an invalid pipeline configuration raises an AssertionError.
     """
@@ -289,9 +288,11 @@ def test_image_pipeline_invalid_configuration():
         },
     ]
 
-    # Check that initializing the pipeline raises an AssertionError
-    with pytest.raises(PipelineConfigurationError):
-        _ = Pipeline(node_configurations)
+    # Check that pipeline execution raises an error
+    with pytest.raises(TypeError):
+        Pipeline(node_configurations).process(
+            Payload(FloatDataType(1.0), empty_context)
+        )
 
 
 def test_data_io_node():
@@ -316,6 +317,6 @@ def test_data_io_node():
 
     # Process the data
     payload = pipeline.process()
-    data, context = payload.data, payload.context
+    data, _ = payload.data, payload.context
 
     assert data.data == FloatMockDataSource().get_data().data * 2.0

@@ -15,6 +15,7 @@
 from abc import abstractmethod
 from typing import Dict, Any, Type, TypeVar, Generic, Iterator, get_args, Optional
 from semantiva.core.semantiva_component import _SemantivaComponent
+from semantiva.logger import Logger
 
 T = TypeVar("T")
 
@@ -32,13 +33,15 @@ class BaseDataType(_SemantivaComponent, Generic[T]):
 
     _data: T
 
-    def __init__(self, data: T):
+    def __init__(self, data: T, logger: Optional[Logger] = None):
         """
         Initialize the BaseDataType with the provided data.
 
         Args:
             data (T): The data to be encapsulated by this data type.
+            logger (Optional[Logger]): Optional logger instance.
         """
+        super().__init__(logger)
         self.validate(data)
         self._data = data
 
@@ -54,6 +57,11 @@ class BaseDataType(_SemantivaComponent, Generic[T]):
 
     @data.setter
     def data(self, data: T):
+        """Set the encapsulated data after validation.
+
+        Args:
+            data (T): The new data to store in this data type.
+        """
         self._data = data
 
     @abstractmethod
@@ -77,6 +85,12 @@ class BaseDataType(_SemantivaComponent, Generic[T]):
         }
 
         return component_metadata
+
+    def __str__(self):
+        return f"{self.__class__.__name__}({self.data})"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.data})"
 
 
 E = TypeVar("E", bound=BaseDataType)
@@ -146,15 +160,16 @@ class DataCollectionType(BaseDataType[S], Generic[E, S]):
         Returns:
             Type[E]: The expected type of elements in the collection.
         """
-        # Attempt get_args(...) first to retrieve type arguments for classes that are
-        # fully parameterized at runtime. This covers most modern Python generics.        args = get_args(cls)
+        # Attempt to retrieve type arguments for classes that are fully
+        # parameterized at runtime. This covers most modern Python generics.
         args = get_args(cls)
         if args:
             return args[0]  # First argument should be `E`
 
-        # If get_args(...) yields no results, fallback to scanning __orig_bases__.
-        # In certain mypy or older Python generics scenarios, type parameters are
-        # registered there rather than in get_args(...).
+        # If ``get_args`` yields no results, fall back to scanning
+        # ``__orig_bases__``. In certain mypy or older Python generics
+        # scenarios, type parameters are registered there rather than in
+        # ``get_args``.
         for base in getattr(cls, "__orig_bases__", []):
             base_args = get_args(base)
             if base_args:
@@ -223,6 +238,14 @@ class NoDataType(BaseDataType[None]):
     """
 
     def validate(self, data: None) -> bool:
+        """Validate that no data is provided.
+
+        Args:
+            data (None): Should always be ``None``.
+
+        Returns:
+            bool: ``True`` if ``data`` is ``None``, ``False`` otherwise.
+        """
         return data is None
 
     def __str__(self) -> str:
