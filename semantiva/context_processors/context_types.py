@@ -31,11 +31,8 @@ class ContextType(_SemantivaComponent):
             context_dict (Optional[Dict], optional): A dictionary of initial context data.
                                                     Defaults to None, resulting in an empty context.
         """
+        super().__init__(logger)
         self._context_container = {} if context_dict is None else context_dict
-        if logger is not None:
-            self.logger = logger
-        else:
-            self.logger = Logger()
 
     def get_value(self, key: str) -> Any:
         """
@@ -86,7 +83,7 @@ class ContextType(_SemantivaComponent):
         Retrieve all keys in the context.
 
         Returns:
-            list: A list of all keys currently stored in the context.
+            List[str]: A list of all keys currently stored in the context.
         """
         return list(self._context_container.keys())
 
@@ -95,7 +92,7 @@ class ContextType(_SemantivaComponent):
         Retrieve all values in the context.
 
         Returns:
-            list: A list of all values currently stored in the context.
+            List[Any]: A list of all values currently stored in the context.
         """
         return list(self._context_container.values())
 
@@ -104,7 +101,7 @@ class ContextType(_SemantivaComponent):
         Retrieve all key-value pairs in the context.
 
         Returns:
-            list: A list of (key, value) tuples for the stored context data.
+            List[Tuple[str, Any]]: A list of (key, value) tuples for the stored context data.
         """
         return list(self._context_container.items())
 
@@ -161,8 +158,8 @@ class ContextCollectionType(ContextType):
             for parallel storage and iteration of separate contexts.
 
         The global_context parameter can be provided in two forms:
-        • As a dictionary, which will be used directly.
-        • As a ContextType, in which case its internal _context_container is extracted.
+        - As a dictionary, which will be used directly.
+        - As a ContextType, in which case its internal _context_container is extracted.
         If global_context is None, an empty dictionary will be used.
 
         Args:
@@ -448,7 +445,7 @@ class ContextCollectionType(ContextType):
         as this indicates an ambiguous or fragile data structure design.
 
         Returns:
-            list: A combined list of all keys present in either the global or individual contexts.
+            List[str]: A combined list of all keys present in either the global or individual contexts.
         """
         # Get keys from the global context.
         global_keys = set(self._context_container.keys())

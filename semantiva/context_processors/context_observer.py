@@ -12,24 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any, Optional, Union
 from collections import ChainMap
-from typing import Any
+from typing import Any, Dict, Optional, Union
 from semantiva.core.semantiva_component import _SemantivaComponent
+from semantiva.logger import Logger
 from .context_types import ContextType, ContextCollectionType
 
 
 class _ContextObserver(_SemantivaComponent):
     """Base class for all nodes in semantiva pipelines responsible for context propagation and updates."""
 
-    def __init__(self):
+    def __init__(self, logger: Optional[Logger] = None):
         """
         Initialize the _ContextObserver with an empty context.
 
         Attributes:
             context (dict): A dictionary to store contextual key-value pairs.
         """
-        self.observer_context = ContextType
+        super().__init__(logger)
+        self.observer_context = ContextType()
 
     @classmethod
     def _define_metadata(cls) -> Dict[str, Any]:

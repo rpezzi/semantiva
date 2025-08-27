@@ -18,7 +18,6 @@ This repository houses the Semantiva framework, a dual-channel pipeline system t
   * **logger/** - Configurable logging helpers.
   * **pipeline/** - Pipeline orchestration, node definitions, and `NodeFactory` for dynamic node creation.
   * **tools/** - Command-line utilities (e.g., ontology export, pipeline inspector).
-  * **utils/** - General-purpose helper functions.
   * **workflows/** - Predefined workflow examples (e.g., model fitting).
 * **tests/** - Pytest suite covering processors, nodes, and pipeline behaviors.
 
@@ -57,9 +56,21 @@ Key concepts include:
 
    For significant changes, add or update tests in the `tests/` directory. Use the existing tests as examples of how to create dummy data types, operations, and probes.
 
-2. **Documentation**
-   Update `README.md` or the documentation under `docs/` if the public API changes or if new features require explanation.
+2. **Documentation (REQUIRED)**
+   Every PR that touches public APIs, processors, nodes, or CLI **must** keep the documentation build green.
+   - **Build locally (fail on warnings)**:
+     ```sh
+     export SPHINXOPTS="-W --keep-going -n"
+     make -C docs clean
+     make -C docs html
+     ```
+     The HTML output is generated in `docs/_build/html`.
+   - **PR checklist** (mandatory):
+     - [ ] Sphinx builds without warnings
+     - [ ] New/changed symbols have docstrings (module, class, methods)
+     - [ ] Cross‑refs (`:py:class:`, `:py:meth:`, `:py:data:`) resolve (no nitpicky errors)
+     - [ ] Tutorials/concepts updated if behavior or CLI UX changed
+   - **CI**: Docs are built and must pass.
+
+3. **Changelog**
    Report changes in `CHANGELOG.md` under the appropriate section.
-
-
-Following these guidelines ensures that agents maintain consistency across the project and that the pipeline remains introspectable and reliable.

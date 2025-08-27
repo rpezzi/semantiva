@@ -32,7 +32,6 @@ from semantiva.execution.orchestrator.orchestrator import (
 )
 from semantiva import Pipeline, Payload
 from semantiva.execution.transport import InMemorySemantivaTransport
-from semantiva.execution.executor import SequentialSemantivaExecutor
 from semantiva.context_processors.context_types import ContextType
 from semantiva.examples.test_utils import FloatDataType, FloatMultiplyOperation
 from semantiva.logger import Logger
@@ -48,8 +47,6 @@ def fake_pipeline():
     """
     # We use an in-memory transport and sequential executor just to satisfy
     # _PipelineNode requirements, though they aren't used by LocalSemantivaOrchestrator directly here.
-    transport = InMemorySemantivaTransport()
-    executor = SequentialSemantivaExecutor()
 
     node_configurations = [
         {
@@ -62,7 +59,6 @@ def fake_pipeline():
         },
     ]
 
-    # Build the Pipeline, which constructs _PipelineNodes internally
     pipeline = Pipeline(node_configurations)
     return pipeline
 
@@ -87,10 +83,11 @@ def test_orchestrator_applies_each_node_and_publishes(fake_pipeline):
     # - transport: in-memory transport captures published intermediates
     # - Logger(): dummy logger for debugging internal steps
     payload_output = orch.execute(
-        fake_pipeline.nodes,
+        fake_pipeline.resolved_spec,
         Payload(initial, ctx),
         InMemorySemantivaTransport(),
         Logger(),
+        canonical_spec=fake_pipeline.canonical_spec,
     )
     data_output, context_output = payload_output.data, payload_output.context
 

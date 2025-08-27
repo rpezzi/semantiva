@@ -39,7 +39,7 @@ from semantiva.execution.job_queue.logging_setup import _setup_log
 from semantiva.examples.test_utils import (
     FloatMultiplyOperation,
     FloatCollectValueProbe,
-    FloatMockDataSource,
+    FloatValueDataSource,
 )
 
 # If you want to demonstrate a non-trivial pipeline, import or define node configurations here:
@@ -49,6 +49,7 @@ LOG_LEVEL = "DEBUG"  # Set to "INFO" for less verbosity
 
 
 def main():
+    """Run a demonstration of the queue-based orchestrator with worker threads."""
     # 1) Prepare transport, executor, orchestrator, and logging
     transport = InMemorySemantivaTransport()
     executor = SequentialSemantivaExecutor()
@@ -111,13 +112,13 @@ def main():
     future1 = orchestrator.enqueue(
         example_job_cfg,
         return_future=True,
-        data=FloatMockDataSource.get_data(),
+        data=FloatValueDataSource.get_data(),
         context=None,
     )
     future2 = orchestrator.enqueue(
         example_job_cfg,
         return_future=True,
-        data=FloatMockDataSource.get_data(),
+        data=FloatValueDataSource.get_data(),
         context=None,
     )
 

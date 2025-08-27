@@ -29,8 +29,8 @@ Custom Resolver System
 The registry supports pluggable resolvers via the `register_resolver` API. A
 resolver is a callable that takes a class name string and returns a class type
 (or None if it does not handle the name). This allows the registry to support
-arbitrary prefixes (e.g., `rename:`, `delete:`, `slicer:`, `sweep:`) without 
-modifying core logic. New resolvers can be registered at runtime, enabling 
+arbitrary prefixes (e.g., `rename:`, `delete:`, `slicer:`, `sweep:`) without
+modifying core logic. New resolvers can be registered at runtime, enabling
 extensibility for future processor types or domain-specific behaviors.
 
 How Resolution Works
@@ -69,7 +69,7 @@ by varying independent parameters over specified ranges. Only the structured YAM
         param_name: value
 
 Example:
-    processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    processor: "sweep:FloatValueDataSource:FloatDataCollection"
     parameters:
       num_steps: 5
       independent_vars:
@@ -96,7 +96,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, cast
 
 from semantiva.logger import Logger
 from semantiva.data_processors.data_processors import _BaseDataProcessor
-from semantiva.data_processors.data_slicer_factory import Slicer
+from semantiva.data_processors.data_slicer_factory import slicer
 from semantiva.data_processors.parametric_sweep_factory import ParametricSweepFactory
 from semantiva.data_io.data_io import DataSource
 from semantiva.data_types.data_types import DataCollectionType
@@ -108,6 +108,7 @@ from semantiva.context_processors.factory import (
     _context_renamer_factory,
 )
 from semantiva.workflows.fitting_model import FittingModel
+from .descriptors import ModelDescriptor
 
 
 class ClassRegistry:
@@ -121,7 +122,7 @@ class ClassRegistry:
     _registered_paths: Set[Path] = set()
     _registered_modules: Set[str] = set()
     _custom_resolvers: List[Callable[[str], Optional[type]]] = []
-    _param_resolvers: List[Callable[[Any], Any | None]] = []
+    _param_resolvers: List[Callable[[Any], Optional[Any]]] = []
 
     @classmethod
     def initialize_default_modules(cls) -> None:
@@ -151,7 +152,9 @@ class ClassRegistry:
         cls._custom_resolvers.append(resolver_fn)
 
     @classmethod
-    def register_param_resolver(cls, resolver_fn: Callable[[Any], Any | None]) -> None:
+    def register_param_resolver(
+        cls, resolver_fn: Callable[[Any], Optional[Any]]
+    ) -> None:
         """Register a resolver for parameter values.
 
         Resolvers are called for every string parameter encountered while
@@ -348,10 +351,10 @@ class ClassRegistry:
     ) -> None:
         """Register a configuration processor for future extensibility.
 
-        FUTURE IMPROVEMENT PATHWAY:
-        ==========================
-        The current preprocessing approach could be generalized into a more flexible
-        configuration processor system. This would allow:
+        Future improvement pathway
+        --------------------------
+        The current preprocessing approach could be generalized into a more
+        flexible configuration processor system. This would allow:
 
         1. Multiple configuration transformers
         2. Ordered processing pipeline
@@ -359,22 +362,22 @@ class ClassRegistry:
         4. Easier testing and maintenance
 
         Example usage:
+
             @ClassRegistry.register_config_processor
             def structured_sweep_processor(config):
                 # Handle sweep: prefix with parameters
                 return transformed_config
 
             @ClassRegistry.register_config_processor
-            def other_structured_processor(config):
-                # Handle other complex configurations
-                return transformed_config
+            def other_processor(config):
+                ...
 
-        This would replace the current hardcoded preprocessing with a pluggable system
-        similar to how resolvers work for simple string-to-class mappings.
+        This would replace the current hardcoded preprocessing with a pluggable
+        system similar to how resolvers work for simple string-to-class mappings.
 
         Args:
             processor_fn: Function that takes a node configuration dict and returns
-                         a potentially modified configuration dict
+                a potentially modified configuration dict
         """
         # Implementation would add to a _config_processors list
         # and iterate through them in preprocess_node_config
@@ -448,7 +451,7 @@ class ClassRegistry:
     @classmethod
     def _get_class_from_module(
         cls, module_name: str, class_name: str
-    ) -> type[ContextProcessor] | type[_BaseDataProcessor] | None:
+    ) -> Optional[type[ContextProcessor | _BaseDataProcessor]]:
         """Lookup in registered modules for the class and
         return its type. If module is not found, return None.
 
@@ -457,7 +460,7 @@ class ClassRegistry:
             class_name (str): The class name of the context processor or base data processor.
 
         Returns:
-            ContextProcessor | _BaseDataProcessor | None: The type of the ContextProcessor or _BaseDataProcessor. If not found, returns None.
+            Optional[type[ContextProcessor | _BaseDataProcessor]]: The type of the ContextProcessor or _BaseDataProcessor. If not found, returns None.
 
         """
 
@@ -471,7 +474,7 @@ class ClassRegistry:
     @classmethod
     def _get_class_from_file(
         cls, file_path: Path, class_name: str
-    ) -> type[ContextProcessor] | type[_BaseDataProcessor] | None:
+    ) -> Optional[type[ContextProcessor | _BaseDataProcessor]]:
         """Lookup in registered paths for the class and return its type.
 
         Args:
@@ -541,7 +544,7 @@ def _slicer_resolver(name: str) -> Optional[type]:
                 )
             processor_t = cast(type[_BaseDataProcessor], processor_cls)
             collection_t = cast(type[DataCollectionType], collection_cls)
-            return Slicer(processor_t, collection_t)
+            return slicer(processor_t, collection_t)
     return None
 
 
@@ -559,12 +562,14 @@ def _parse_scalar(value: str) -> Any:
             return value
 
 
-def _model_param_resolver(spec: Any) -> FittingModel | None:
-    """Instantiate fitting models from ``model:``-prefixed specs.
+def _model_param_resolver(spec: Any) -> Optional[ModelDescriptor]:
+    """Return a :class:`ModelDescriptor` from ``model:``-prefixed specs.
 
     The expected format is ``model:ClassName:k1=v1,k2=v2``.  The class name is
     resolved using :meth:`ClassRegistry.get_class` and keyword arguments are
-    parsed as simple scalars.
+    parsed as simple scalars, but **not** instantiated.  This keeps the
+    canonical specification free of live objects while retaining enough
+    information to construct the model later.
     """
 
     if isinstance(spec, str) and spec.startswith("model:"):
@@ -580,5 +585,6 @@ def _model_param_resolver(spec: Any) -> FittingModel | None:
                     continue
                 key, _, val = item.partition("=")
                 kwargs[key] = _parse_scalar(val)
-        return model_cls(**kwargs)
+        class_path = f"{model_cls.__module__}.{model_cls.__qualname__}"
+        return ModelDescriptor(class_path, kwargs)
     return None

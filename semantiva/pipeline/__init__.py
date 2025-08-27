@@ -12,10 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Semantiva pipeline API.
+
+Includes:
+  - Pipeline: execution wrapper around configured nodes.
+  - Payload: (data, context) pair.
+  - build_graph / compute_pipeline_id: Canonical GraphV1 + deterministic PipelineId.
+"""
+
 from .pipeline import Pipeline
 from .payload import Payload
+from .graph_builder import build_graph, compute_pipeline_id
 
 __all__ = [
     "Pipeline",
     "Payload",
+    "build_graph",
+    "compute_pipeline_id",
 ]

@@ -21,7 +21,7 @@ import numpy as np
 from semantiva.pipeline import Pipeline, Payload
 from semantiva.context_processors.context_types import ContextType
 from semantiva.data_types import NoDataType
-from semantiva.examples.test_utils import FloatDataCollection, FloatDataType
+from semantiva.examples.test_utils import FloatDataCollection
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def test_parametric_sweep_yaml(empty_context):
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 5
         independent_vars:
@@ -49,12 +49,11 @@ pipeline:
 
     pipeline = Pipeline(node_configs)
 
-    # Verify the processor was created correctly
-    processor_class = pipeline.nodes[0].processor.__class__
-    assert "ParametricSweep" in processor_class.__name__
-
     # Test execution
     payload = pipeline.process(Payload(NoDataType(), empty_context))
+    # Verify the processor was created correctly after instantiation
+    processor_class = pipeline.nodes[0].processor.__class__
+    assert "ParametricSweep" in processor_class.__name__
     data, context = payload.data, payload.context
 
     assert isinstance(data, FloatDataCollection)
@@ -72,7 +71,7 @@ def test_multi_variable_sweep(empty_context):
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 4
         independent_vars:
@@ -109,7 +108,7 @@ def test_sweep_with_static_params(empty_context):
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 3
         independent_vars:
@@ -143,7 +142,7 @@ def test_sweep_no_expressions(empty_context):
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 3
         independent_vars:
@@ -168,7 +167,7 @@ def test_sweep_invalid_num_steps():
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 1
         independent_vars:
@@ -178,11 +177,8 @@ pipeline:
     node_configs = yaml.safe_load(yaml_config)["pipeline"]["nodes"]
 
     # Should fail during pipeline creation
-    from semantiva.exceptions import PipelineConfigurationError
 
-    with pytest.raises(
-        PipelineConfigurationError, match="num_steps must be an integer greater than 1"
-    ):
+    with pytest.raises(ValueError, match="num_steps must be an integer greater than 1"):
         Pipeline(node_configs)
 
 
@@ -192,7 +188,7 @@ def test_sweep_invalid_vars_format():
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 3
         independent_vars:
@@ -202,9 +198,8 @@ pipeline:
     node_configs = yaml.safe_load(yaml_config)["pipeline"]["nodes"]
 
     # Should fail during pipeline creation
-    from semantiva.exceptions import PipelineConfigurationError
 
-    with pytest.raises(PipelineConfigurationError, match="must have range format"):
+    with pytest.raises(ValueError, match="must have range format"):
         Pipeline(node_configs)
 
 
@@ -214,7 +209,7 @@ def test_sweep_missing_required_params():
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         # Missing num_steps and independent_vars
         parametric_expressions:
@@ -224,10 +219,9 @@ pipeline:
     node_configs = yaml.safe_load(yaml_config)["pipeline"]["nodes"]
 
     # Should fail with standard class resolution error since structured processing fails
-    from semantiva.exceptions import PipelineConfigurationError
 
-    with pytest.raises(PipelineConfigurationError, match="not found"):
-        Pipeline(node_configs)
+    with pytest.raises(ValueError, match="not found"):
+        Pipeline(node_configs).process(Payload(NoDataType(), empty_context))
 
 
 def test_complex_sweep_example(empty_context):
@@ -236,7 +230,7 @@ def test_complex_sweep_example(empty_context):
     yaml_config = """
 pipeline:
   nodes:
-    - processor: "sweep:FloatMockDataSource:FloatDataCollection"
+    - processor: "sweep:FloatValueDataSource:FloatDataCollection"
       parameters:
         num_steps: 3
         independent_vars:

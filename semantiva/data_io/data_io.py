@@ -13,16 +13,20 @@
 # limitations under the License.
 
 from abc import abstractmethod
-from typing import Dict, Any, TypeVar, Generic, List
+from typing import Dict, Any, TypeVar, Generic, List, Optional
 from semantiva.data_types import BaseDataType
 from semantiva.pipeline.payload import Payload
 from semantiva.core.semantiva_component import _SemantivaComponent
+from semantiva.logger import Logger
 
 T = TypeVar("T", bound=BaseDataType)
 
 
 class DataSource(_SemantivaComponent):
     """Abstract base class representing a data source in Semantiva."""
+
+    def __init__(self, logger: Optional[Logger] = None):
+        super().__init__(logger=logger)
 
     @classmethod
     @abstractmethod
@@ -96,6 +100,9 @@ class DataSource(_SemantivaComponent):
 class PayloadSource(_SemantivaComponent):
     """Abstract base class for providing structured payloads (data and context) in Semantiva."""
 
+    def __init__(self, logger: Optional[Logger] = None):
+        super().__init__(logger=logger)
+
     @classmethod
     def _define_metadata(cls) -> Dict[str, Any]:
 
@@ -135,7 +142,7 @@ class PayloadSource(_SemantivaComponent):
             **kwargs: Keyword arguments for payload retrieval.
 
         Returns:
-            Tuple[BaseDataType, ContextType]: The retrieved payload and its context.
+            Payload: The retrieved payload containing data and context.
         """
         ...
 
@@ -148,7 +155,7 @@ class PayloadSource(_SemantivaComponent):
             **kwargs: Keyword arguments for payload retrieval.
 
         Returns:
-            Tuple[BaseDataType, ContextType]: The retrieved payload and its context
+            Payload: The retrieved payload containing data and context.
         """
         return self._get_payload(*args, **kwargs)
 
@@ -191,12 +198,16 @@ class PayloadSource(_SemantivaComponent):
 class DataSink(_SemantivaComponent, Generic[T]):
     """Abstract base class for data sinks that consume and store data."""
 
+    def __init__(self, logger: Optional[Logger] = None):
+        super().__init__(logger=logger)
+
     @abstractmethod
     def _send_data(self, data: T, *args, **kwargs) -> None:
         """
         Abstract method to implement data transmission logic.
 
         Args:
+            data: The data object to transmit.
             *args: Positional arguments for data transmission.
             **kwargs: Keyword arguments for data transmission.
 
@@ -238,6 +249,7 @@ class DataSink(_SemantivaComponent, Generic[T]):
         Send data by invoking the `_send_data` method.
 
         Args:
+            data: The data object to transmit.
             *args: Positional arguments for data transmission.
             **kwargs: Keyword arguments for data transmission.
 
@@ -264,6 +276,9 @@ class DataSink(_SemantivaComponent, Generic[T]):
 class PayloadSink(_SemantivaComponent, Generic[T]):
     """Abstract base class for payload sinks that consume and store data along with its associated context."""
 
+    def __init__(self, logger: Optional[Logger] = None):
+        super().__init__(logger=logger)
+
     @abstractmethod
     def _send_payload(self, payload: Payload, *args, **kwargs):
         """
@@ -281,11 +296,10 @@ class PayloadSink(_SemantivaComponent, Generic[T]):
 
     def send_payload(self, payload: Payload, *args, **kwargs) -> None:
         """
-        Consume the provided data and context by invoking the `_send_payload` method.
+        Consume the provided payload by invoking the `_send_payload` method.
 
         Args:
-            data (BaseDataType): The data payload to consume.
-            context (ContextType): The context associated with the data.
+            payload: Payload containing data and context to consume.
             *args: Additional positional arguments for payload consumption.
             **kwargs: Additional keyword arguments for payload consumption.
 

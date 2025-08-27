@@ -1,0 +1,7 @@
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatMultiplyOperation
+      parameters:
+        factor: 2.0
+    - processor: FloatMockDataSink

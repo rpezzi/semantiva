@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from types import new_class
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type, Union
 from semantiva.data_processors.io_operation_factory import _IOOperationFactory
 from semantiva.data_io import DataSource, PayloadSource, DataSink, PayloadSink
 from semantiva.data_processors.data_processors import (
@@ -41,6 +41,13 @@ from .nodes import (
 )
 
 
+def _resolve_class(class_name: Union[str, Type, None]) -> Optional[Type]:
+    """Resolve a class name to an actual class using the registry."""
+    if isinstance(class_name, str):
+        return ClassRegistry.get_class(class_name)
+    return class_name
+
+
 class _PipelineNodeFactory:
     """
     Factory class to create nodes based on the provided configuration.
@@ -54,7 +61,7 @@ class _PipelineNodeFactory:
     ) -> Type:
         """
         Dynamically create a subclass of `base_cls` whose namespace is
-        pre‑populated with `class_attrs`.
+        pre-populated with `class_attrs`.
         """
         return new_class(
             name,
@@ -85,14 +92,8 @@ class _PipelineNodeFactory:
         processor = node_definition.get("processor")
         parameters = node_definition.get("parameters", {})
 
-        def get_class(class_name):
-            """Helper function to retrieve the class from the loader if the input is a string."""
-            if isinstance(class_name, str):
-                return ClassRegistry.get_class(class_name)
-            return class_name
-
         # Resolve the processor class if provided as a string.
-        processor = get_class(processor)
+        processor = _resolve_class(processor)
 
         if processor is None or not isinstance(processor, type):
             raise ValueError("processor must be a class type or a string, not None.")
@@ -106,9 +107,13 @@ class _PipelineNodeFactory:
                 processor, parameters, logger
             )
         if issubclass(processor, DataSink):
-            return _PipelineNodeFactory.create_data_sink_node(processor, parameters)
+            return _PipelineNodeFactory.create_data_sink_node(
+                processor, parameters, logger
+            )
         if issubclass(processor, PayloadSink):
-            return _PipelineNodeFactory.create_payload_sink_node(processor, parameters)
+            return _PipelineNodeFactory.create_payload_sink_node(
+                processor, parameters, logger
+            )
 
         raise ValueError(
             "Unsupported processor. Processor must be of type DataOperation, DataProbe, DataSource, PayloadSource, DataSink, or PayloadSink."
@@ -136,7 +141,7 @@ class _PipelineNodeFactory:
         processor = _IOOperationFactory.create_data_operation(data_io_class)
 
         node_class = _PipelineNodeFactory._create_class(
-            name="_PayloadSourceNode",
+            name=f"{data_io_class.__name__}_PayloadSourceNode",
             base_cls=_PayloadSourceNode,
             processor=data_io_class,
         )
@@ -146,7 +151,9 @@ class _PipelineNodeFactory:
 
     @staticmethod
     def create_payload_sink_node(
-        data_io_class: Type[PayloadSink], parameters: Optional[Dict] = None
+        data_io_class: Type[PayloadSink],
+        parameters: Optional[Dict] = None,
+        logger: Optional[Logger] = None,
     ) -> _PayloadSinkNode:
         """Factory function to create an extended _PayloadSinkNode.
         This function dynamically creates a subclass of _PayloadSinkNode
@@ -165,11 +172,15 @@ class _PipelineNodeFactory:
             base_cls=_PayloadSinkNode,
             processor=data_io_class,
         )
-        return node_class(processor=processor, processor_parameters=parameters)
+        return node_class(
+            processor=processor, processor_parameters=parameters, logger=logger
+        )
 
     @staticmethod
     def create_data_sink_node(
-        data_io_class: Type[DataSink], parameters: Optional[Dict] = None
+        data_io_class: Type[DataSink],
+        parameters: Optional[Dict] = None,
+        logger: Optional[Logger] = None,
     ) -> _DataSinkNode:
         """Factory function to create an extended _DataSinkNode.
         This function dynamically creates a subclass of _DataSinkNode
@@ -189,7 +200,9 @@ class _PipelineNodeFactory:
             processor=data_io_class,
         )
 
-        return node_class(processor=processor, processor_parameters=parameters)
+        return node_class(
+            processor=processor, processor_parameters=parameters, logger=logger
+        )
 
     @staticmethod
     def create_data_source_node(
@@ -211,7 +224,7 @@ class _PipelineNodeFactory:
         processor = _IOOperationFactory.create_data_operation(data_io_class)
 
         node_class = _PipelineNodeFactory._create_class(
-            name="_DataSourceNode",
+            name=f"{data_io_class.__name__}_DataSourceNode",
             base_cls=_DataSourceNode,
             processor=data_io_class,
         )
@@ -284,7 +297,7 @@ class _PipelineNodeFactory:
         context_keyword: str,
         **processor_kwargs,
     ) -> _DataOperationContextInjectorProbeNode:
-        """Wrap a :class:`DataOperation` in a context‑injecting probe node."""
+        """Wrap a :class:`DataOperation` in a context-injecting probe node."""
 
         if (
             not isinstance(processor_cls, type)
@@ -408,12 +421,6 @@ def _pipeline_node_factory(
         ValueError: If the node definition is invalid or if the processor type is unsupported.
     """
 
-    def get_class(class_name):
-        """Helper function to retrieve the class from the loader if the input is a string."""
-        if isinstance(class_name, str):
-            return ClassRegistry.get_class(class_name)
-        return class_name
-
     # DESIGN NOTE: Structured Parametric Sweep Preprocessing
     # ======================================================
     #
@@ -428,7 +435,7 @@ def _pipeline_node_factory(
     #
     # EXAMPLE OF THE PROBLEM:
     # YAML Input:
-    #   processor: "sweep:FloatMockDataSource:FloatDataCollection"  # <- Resolver sees this
+    #   processor: "sweep:FloatValueDataSource:FloatDataCollection"  # <- Resolver sees this
     #   parameters:                                                 # <- Resolver cannot see this
     #     num_steps: 5
     #     independent_vars: { t: [0, 10] }
@@ -455,7 +462,7 @@ def _pipeline_node_factory(
     context_keyword = node_definition.get("context_keyword")
 
     # Resolve the processor class if provided as a string.
-    processor = get_class(processor)
+    processor = _resolve_class(processor)
 
     if processor is None or not isinstance(processor, type):
         raise ValueError("processor must be a class type or a string, not None.")

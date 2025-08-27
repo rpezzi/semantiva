@@ -20,6 +20,8 @@ from semantiva.data_types import BaseDataType, NoDataType
 from semantiva.pipeline.payload import Payload
 from semantiva.context_processors.context_types import ContextType
 from semantiva.logger import Logger
+from semantiva.data_processors.data_processors import ParameterInfo, _NO_DEFAULT
+from collections import OrderedDict
 
 
 class _IOOperationFactory:
@@ -37,13 +39,15 @@ class _IOOperationFactory:
         ),
     ) -> Type[DataOperation]:
         """
-        Dynamically creates a subclass of DataOperation that wraps a data IO class.
+        Dynamically create a :class:`DataOperation` subclass that wraps a data-IO class.
 
         Args:
-            data_io_class (Type[DataSource] | Type[PayloadSource] | Type[DataSink] | Type[PayloadSink]):
-                The data IO class to wrap in a DataOperation subclass.
+            cls: Factory class reference.
+            data_io_class: The ``DataSource``/``PayloadSource``/``DataSink``/``PayloadSink``
+                class to wrap.
+
         Returns:
-            Type[DataOperation]: A new subclass of DataOperation with the specified I/O data types.
+            Type[DataOperation]: A new subclass of ``DataOperation`` with matching I/O types.
         """
 
         methods: dict = {}
@@ -51,12 +55,15 @@ class _IOOperationFactory:
         if issubclass(data_io_class, (DataSource, PayloadSource)):
 
             def get_no_data_type():
+                """Return ``NoDataType``."""
                 return NoDataType
 
             def input_data_type_method(cls) -> BaseDataType:
+                """Return NoDataType: data sources do not accept input data."""
                 return get_no_data_type()
 
             def output_data_type_method(cls) -> BaseDataType:
+                """Return the data type produced by the underlying source."""
                 return data_io_class.output_data_type()
 
             if issubclass(data_io_class, DataSource):
@@ -93,15 +100,20 @@ class _IOOperationFactory:
                     self, data: BaseDataType, *args, **kwargs
                 ) -> BaseDataType:
                     data_io_instance = data_io_class()
-                    loaded_data = data_io_instance._get_payload(*args, **kwargs).data
-                    Logger().warning(
-                        f"Context loading from Wrapped PayloadSource in pipelines is not supported ({data_io_class.__name__})"
-                    )
+                    payload = data_io_instance._get_payload(*args, **kwargs)
+                    loaded_data = payload.data
+                    # If the payload provides a context, notify the DataOperation observer
+                    loaded_context = payload.context
+
+                    for key, value in loaded_context.items():
+                        self._notify_context_update(key, value)
+
+                    # Return only the loaded data (context is injected via notifications)
                     return loaded_data
 
                 def get_processing_parameter_names(cls) -> List[str]:
                     """
-                    Retrieve the names of parameters required by the `_get_data` method.
+                    Retrieve the names of parameters required by the `_get_payload` method.
 
                     Returns:
                         List[str]: A list of parameter names (excluding `self` and `data`).
@@ -118,12 +130,26 @@ class _IOOperationFactory:
                         }
                     ]
 
+                def context_keys_method(cls) -> list:
+                    """Return context keys injected by the payload source."""
+                    return list(data_io_class.injected_context_keys())
+
+                def get_created_keys_method(cls) -> list:
+                    """Return context keys created by this operation."""
+                    return cls.context_keys()
+
+                # expose created/context keys so the node metadata and notifications work
+                methods["context_keys"] = classmethod(context_keys_method)
+                methods["get_created_keys"] = classmethod(get_created_keys_method)
+
         elif issubclass(data_io_class, (DataSink, PayloadSink)):
 
             def input_data_type_method(cls) -> BaseDataType:
+                """Return the data type consumed by the underlying sink."""
                 return data_io_class.input_data_type()
 
             def output_data_type_method(cls) -> BaseDataType:
+                """Return the data type passed through by the sink."""
                 return data_io_class.input_data_type()
 
             if issubclass(data_io_class, DataSink):
@@ -137,7 +163,7 @@ class _IOOperationFactory:
 
                 def get_processing_parameter_names(cls) -> List[str]:
                     """
-                    Retrieve the names of parameters required by the `_get_data` method.
+                    Retrieve the names of parameters required by the `_send_data` method.
 
                     Returns:
                         List[str]: A list of parameter names (excluding `self` and `data`).
@@ -198,6 +224,58 @@ class _IOOperationFactory:
         methods["get_processing_parameter_names"] = classmethod(
             get_processing_parameter_names
         )
+
+        # Build parameter metadata from the underlying data-IO method signature
+        try:
+            sig = inspect.signature(
+                # choose the correct method to inspect
+                data_io_class._get_data
+                if issubclass(data_io_class, DataSource)
+                else (
+                    data_io_class._get_payload
+                    if issubclass(data_io_class, PayloadSource)
+                    else (
+                        data_io_class._send_data
+                        if issubclass(data_io_class, DataSink)
+                        else data_io_class._send_payload
+                    )
+                )
+            )
+        except Exception:
+            sig = None
+
+        if sig:
+            details = OrderedDict()
+            for param in sig.parameters.values():
+                if param.name in {"self", "data", "payload"}:
+                    continue
+                if param.kind in {
+                    inspect.Parameter.VAR_POSITIONAL,
+                    inspect.Parameter.VAR_KEYWORD,
+                }:
+                    continue
+                default = (
+                    param.default
+                    if param.default is not inspect._empty
+                    else _NO_DEFAULT
+                )
+                annotation = (
+                    getattr(param.annotation, "__name__", str(param.annotation))
+                    if param.annotation is not inspect._empty
+                    else "Unknown"
+                )
+                details[param.name] = ParameterInfo(
+                    default=default, annotation=annotation
+                )
+
+            def _define_metadata_override(cls):
+                # Start from DataOperation metadata and inject our parameter details
+                # Use super() to invoke the parent class implementation bound to `cls`
+                base = super(DataOperation, cls)._define_metadata()
+                base["parameters"] = details
+                return base
+
+            methods["_define_metadata"] = classmethod(_define_metadata_override)
 
         # Create a new type that extends DataOperation
         class_name = f"{data_io_class.__name__}"

@@ -19,6 +19,7 @@ via a SemantivaTransport, executes them using a SemantivaExecutor, and publishes
 
 import time
 from threading import Event
+from typing import Optional
 
 from semantiva.execution.transport.base import SemantivaTransport
 from semantiva.data_types import NoDataType
@@ -27,7 +28,7 @@ from semantiva.execution.executor.executor import SemantivaExecutor
 from semantiva import Pipeline, Payload
 from semantiva.logger.logger import Logger
 from .logging_setup import _setup_log
-import semantiva
+from semantiva.configurations.load_pipeline_from_yaml import load_pipeline_from_yaml
 
 
 def worker_loop(
@@ -35,7 +36,7 @@ def worker_loop(
     transport: SemantivaTransport,
     executor: SemantivaExecutor,
     stop_event: Event,
-    logger: Logger | None = None,
+    logger: Optional[Logger] = None,
     poll_interval: float = 0.1,
 ):
     """
@@ -67,9 +68,7 @@ def worker_loop(
     or containers while decoupling job submission (by the orchestrator) from execution.
     """
     # Initialize or reuse the logger for this worker
-    worker_logger: semantiva.logger.logger.Logger = logger or _setup_log(
-        f"worker_{worker_id}"
-    )
+    worker_logger: Logger = logger or _setup_log(f"worker_{worker_id}")
     assert worker_logger, "Logger must be provided or created"
     worker_logger.info(f"Worker_{worker_id} starting…")
 
@@ -89,13 +88,25 @@ def worker_loop(
                 job_id = msg.metadata.get("job_id") or "<unknown>"
                 worker_logger.info(f"Picked up job {job_id}")
 
-                payload = msg.data
                 # Optional debug output of the raw Message
                 worker_logger.debug(f"Worker {job_id} received message: {msg}")
 
                 try:
                     # 1) Unpack the payload dictionary
                     pcfg = msg.metadata.get("pipeline")
+                    # If pipeline metadata is a path to a YAML file, load it
+                    if isinstance(pcfg, str):
+                        try:
+                            pcfg = load_pipeline_from_yaml(pcfg)
+                        except Exception as e:
+                            worker_logger.error(
+                                f"Failed to load pipeline YAML for job {job_id} from '{pcfg}': {e}"
+                            )
+                            try:
+                                msg.ack()
+                            except Exception:
+                                pass
+                            continue
                     if not isinstance(pcfg, list) or not all(
                         isinstance(step, dict) for step in pcfg
                     ):

@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import pytest
-import os
 from pathlib import Path
 
-from semantiva import Pipeline, load_pipeline_from_yaml
-from semantiva.examples.test_utils import FloatDataType, FloatMockDataSource
+from semantiva import Pipeline, load_pipeline_from_yaml, Payload
+from semantiva.examples.test_utils import FloatDataType
 from semantiva.context_processors import ContextType
+from semantiva.data_types import NoDataType
 
 
 def test_load_pipeline_from_yaml():
@@ -38,8 +38,8 @@ def test_load_pipeline_from_yaml():
     assert isinstance(node_configurations, list), "Configuration should be a list"
     assert len(node_configurations) > 0, "Configuration should not be empty"
 
-    # Check that the first node is our FloatMockDataSource
-    assert node_configurations[0]["processor"] == "FloatMockDataSource"
+    # Check that the first node is our FloatValueDataSource
+    assert node_configurations[0]["processor"] == "FloatValueDataSource"
 
     # Create and execute the pipeline
     pipeline = Pipeline(node_configurations)
@@ -59,7 +59,7 @@ def test_load_pipeline_from_yaml():
     ), "Context should not contain deleted key 'initial_float'"
 
     # Verify the mathematical pipeline progression
-    # Starting value from FloatMockDataSource: 42.0
+    # Starting value from FloatValueDataSource: 42.0
     # FloatCollectValueProbe: collects 42.0 as "initial_float"
     # rename:initial_float:addend: renames "initial_float" to "addend" (value still 42.0)
     # After FloatMultiplyOperation (factor=2.5): 42.0 * 2.5 = 105.0
@@ -124,8 +124,9 @@ def test_yaml_string_class_resolution():
     # Load configuration
     node_configurations = load_pipeline_from_yaml(str(yaml_file))
 
-    # Create pipeline - this tests that all string class names can be resolved
+    # Create pipeline and run once to instantiate nodes
     pipeline = Pipeline(node_configurations)
+    pipeline.process(Payload(NoDataType(), ContextType()))
 
     # Verify that the pipeline nodes were created successfully
     assert len(pipeline.nodes) > 0, "Pipeline should have nodes"
@@ -134,7 +135,6 @@ def test_yaml_string_class_resolution():
     for i, node_config in enumerate(node_configurations):
         processor = node_config["processor"]
         if isinstance(processor, str):
-            # The pipeline creation should have resolved this string to a class
             node = pipeline.nodes[i]
             assert hasattr(
                 node, "processor"
