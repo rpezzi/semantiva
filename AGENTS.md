@@ -64,7 +64,7 @@ Key concepts include:
 - Declare context creation via ``get_created_keys`` and rely on observer hooks
   for writes.
 - When adding docs/examples, show context keys being stored by nodes (via
-  ``context_key``) rather than by processors directly.
+  ``context_key``) rather thaole outputs are updated? My concern is loosing precise console output from docs in the split of pipeline.rst. Hn by processors directly.
 
 **Do NOT do this**
 
@@ -80,7 +80,7 @@ Key concepts include:
 
 ## Contribution Workflow
 
-1. **Formatting and Static Analysis**
+### 1. **Formatting and Static Analysis**
    Run the following commands from the repository root before committing:
    ```sh
    black .
@@ -93,7 +93,7 @@ Key concepts include:
 
    For significant changes, add or update tests in the `tests/` directory. Use the existing tests as examples of how to create dummy data types, operations, and probes.
 
-2. **Documentation (REQUIRED)**
+### 2. **Documentation (REQUIRED)**
    Every PR that touches public APIs, processors, nodes, or CLI **must** keep the documentation build green.
    - **Build locally (fail on warnings)**:
      ```sh
@@ -107,7 +107,50 @@ Key concepts include:
      - [ ] New/changed symbols have docstrings (module, class, methods)
      - [ ] Cross‑refs (`:py:class:`, `:py:meth:`, `:py:data:`) resolve (no nitpicky errors)
      - [ ] Tutorials/concepts updated if behavior or CLI UX changed
+     - [ ] Code snippets with console output updated (see below)
    - **CI**: Docs are built and must pass.
 
-3. **Changelog**
+#### Docs: Python snippets & console output
+
+When working on documentation epics that touch `*.rst` files with Python
+examples, follow these rules:
+
+- Treat every `.. code-block:: python` that prints/logs output as
+  **executable code**, not pseudocode.
+- Whenever you change, move, or create such a Python block:
+  - Extract it into a temporary script or a REPL in the current checkout.
+  - Run it against the local Semantiva codebase.
+  - Copy the **actual console output** into a neighbouring
+    `.. code-block:: console`, `.. code-block:: text`, or similar block.
+- **Do not fabricate or hand-edit** outputs to “look nice”. Outputs must
+  come from real execution.
+
+**When a snippet fails**
+
+- First, check whether the failure is caused by:
+  - Outdated imports or names (API drift).
+  - Missing minimal context (e.g. a variable or type not defined in the
+    snippet but easy to add).
+- Prefer **minimal, API-correct fixes** that:
+  - Keep the original teaching intent.
+  - Reflect the current public Semantiva API.
+- If fixing the snippet would change its meaning or turn it into a new
+  example:
+  - **Stop and surface the failure** in your completion instead of
+    redesigning the example.
+  - Optionally add `.. note:: This example needs review against the current
+    API.` in the docs rather than silently guessing.
+
+**When you cannot run the snippet**
+
+- Only if the environment genuinely prevents execution (e.g. missing
+  external data, network, or long-running job), you may:
+  - Keep outputs clearly marked as **illustrative**, not exact.
+  - Add a short `.. note:: Output abbreviated / illustrative.` next to
+    the block.
+- Always prefer **real output** when feasible.
+
+
+
+### 3. **Changelog**
    Report changes in `CHANGELOG.md` under the appropriate section.
