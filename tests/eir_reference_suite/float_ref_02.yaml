@@ -1,0 +1,14 @@
+# tests/eir_reference_suite/float_ref_02.yaml
+# Reference pipeline (float_ref_02): source -> multiply -> add (output-only)
+#
+# Parameters are resolved from runtime context keys:
+# - value   -> FloatValueDataSource(value=...)
+# - factor  -> FloatMultiplyOperation(factor=...)
+# - addend  -> FloatAddOperation(addend=...)
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatMultiplyOperation
+    - processor: FloatAddOperation

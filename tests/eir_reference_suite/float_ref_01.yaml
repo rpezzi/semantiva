@@ -1,0 +1,16 @@
+# tests/eir_reference_suite/float_ref_01.yaml
+# Reference pipeline (float_ref_01): source -> add -> probe (context)
+#
+# Parameters for source/add are resolved from runtime context keys:
+# - value   -> FloatValueDataSource(value=...)
+# - addend  -> FloatAddOperation(addend=...)
+#
+# Probe writes its result to context_key="result" (pass-through data).
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatAddOperation
+    - processor: FloatCollectValueProbe
+      context_key: "result"

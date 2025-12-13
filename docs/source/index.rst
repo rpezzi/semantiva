@@ -89,6 +89,7 @@ R&D workflows (see :doc:`pipelines_python`).
    architecture/context_processing
    architecture/pipeline_schema
    architecture/registry
+   eir/index
    studio_viewer
 
 .. toctree::
