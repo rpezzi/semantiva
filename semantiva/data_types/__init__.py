@@ -17,6 +17,11 @@
 Defines base types and collections for structured data in Semantiva.
 """
 
-from .data_types import BaseDataType, DataCollectionType, NoDataType
+from .data_types import (
+    BaseDataType,
+    DataCollectionType,
+    MultiChannelDataType,
+    NoDataType,
+)
 
-__all__ = ["BaseDataType", "DataCollectionType", "NoDataType"]
+__all__ = ["BaseDataType", "DataCollectionType", "MultiChannelDataType", "NoDataType"]

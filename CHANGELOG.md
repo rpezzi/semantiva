@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 - Added EIRv1 series scaffolding (docs SSOT + float reference suite harness) with no runtime behavior changes.
 - Extended SVA220 to accept DataOperation IO inference from `_process_logic` type annotations; added SVA222 mismatch diagnostic (EIRv1 Phase 0).
+- EIRv1 P1: added MultiChannelDataType and a scalar→channel→scalar float reference pipeline (float_ref_channel_01) with SSOT ledger + regression coverage.
 
 
 ## [v0.5.1] - Unreleased

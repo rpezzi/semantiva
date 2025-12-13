@@ -261,3 +261,38 @@ class NoDataType(BaseDataType[None]):
         Initializes a NoDataType instance
         """
         super().__init__(data, *args, **kwargs)
+
+
+class MultiChannelDataType(BaseDataType[dict[str, "BaseDataType[Any]"]]):
+    """A mapping of channel name -> BaseDataType."""
+
+    def validate(self, data: dict[str, "BaseDataType[Any]"]) -> bool:
+        if not isinstance(data, dict):
+            raise TypeError(
+                "MultiChannelDataType data must be a dict[str, BaseDataType]"
+            )
+        for key, value in data.items():
+            if not isinstance(key, str):
+                raise TypeError("MultiChannelDataType keys must be str")
+            if not isinstance(value, BaseDataType):
+                raise TypeError(
+                    "MultiChannelDataType values must be BaseDataType instances"
+                )
+        return True
+
+    def keys(self) -> list[str]:
+        return list(self._data.keys())
+
+    def get(self, channel: str) -> "BaseDataType[Any]":
+        return self._data[channel]
+
+    def with_channel(
+        self, channel: str, value: "BaseDataType[Any]"
+    ) -> "MultiChannelDataType":
+        if not isinstance(channel, str):
+            raise TypeError("channel must be str")
+        if not isinstance(value, BaseDataType):
+            raise TypeError("value must be a BaseDataType instance")
+        updated = dict(self._data)
+        updated[channel] = value
+        return MultiChannelDataType(updated)

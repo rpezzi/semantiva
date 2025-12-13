@@ -67,6 +67,13 @@ REF_CASES: List[RefCase] = [
         expected_data_float=19.0,
         expected_added_context_keys=[],
     ),
+    RefCase(
+        ref_id="float_ref_channel_01",
+        yaml_path=SUITE_DIR / "float_ref_channel_01.yaml",
+        initial_context={"value": 1.5, "addend": 0.5},
+        expected_data_float=2.0,
+        expected_added_context_keys=[],
+    ),
 ]
 
 
@@ -130,12 +137,14 @@ def test_float_reference_suite_executes(case: RefCase) -> None:
     assert added == sorted(case.expected_added_context_keys)
 
 
-def test_float_reference_suite_emits_ser_schema_conformant(tmp_path: Path) -> None:
+@pytest.mark.parametrize("case", REF_CASES, ids=[c.ref_id for c in REF_CASES])
+def test_float_reference_suite_emits_ser_schema_conformant(
+    tmp_path: Path, case: RefCase
+) -> None:
     """Golden: ensure SER emission remains schema-valid for a reference pipeline."""
     if jsonschema is None:  # pragma: no cover
         pytest.skip("jsonschema not installed")
 
-    case = REF_CASES[0]
     cfg = load_pipeline_from_yaml(str(case.yaml_path))
 
     trace_path = tmp_path / "eir_ref.ser.jsonl"

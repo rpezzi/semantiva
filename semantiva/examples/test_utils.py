@@ -18,7 +18,7 @@ Provides helpers for validating expected behavior in pipeline tests.
 """
 
 # This file contains utility classes for testing the semantiva package.
-from semantiva.data_types import BaseDataType, DataCollectionType
+from semantiva.data_types import BaseDataType, DataCollectionType, MultiChannelDataType
 from semantiva.data_processors import DataOperation, DataProbe
 from semantiva.data_io import DataSource, PayloadSource, DataSink, PayloadSink
 from semantiva.pipeline import Payload
@@ -145,6 +145,43 @@ class FloatAddOperation(FloatOperation):
 
     def _process_logic(self, data, addend: float):
         return FloatDataType(data.data + addend)
+
+
+class FloatChannelizeOperation(DataOperation):
+    """Wrap a FloatDataType into a single-channel MultiChannelDataType."""
+
+    @classmethod
+    def input_data_type(cls):
+        return FloatDataType
+
+    @classmethod
+    def output_data_type(cls):
+        return MultiChannelDataType
+
+    def _process_logic(self, data, channel: str):
+        if not isinstance(channel, str) or not channel:
+            raise ValueError("channel must be a non-empty string")
+        return MultiChannelDataType({channel: data})
+
+
+class FloatSelectChannelOperation(DataOperation):
+    """Select a FloatDataType from a MultiChannelDataType by channel name."""
+
+    @classmethod
+    def input_data_type(cls):
+        return MultiChannelDataType
+
+    @classmethod
+    def output_data_type(cls):
+        return FloatDataType
+
+    def _process_logic(self, data, channel: str):
+        if not isinstance(channel, str) or not channel:
+            raise ValueError("channel must be a non-empty string")
+        selected = data.get(channel)
+        if not isinstance(selected, FloatDataType):
+            raise TypeError(f"channel '{channel}' must contain FloatDataType")
+        return selected
 
 
 class FloatSquareOperation(FloatOperation):

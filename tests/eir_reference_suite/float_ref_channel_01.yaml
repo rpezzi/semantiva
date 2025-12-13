@@ -1,0 +1,18 @@
+# tests/eir_reference_suite/float_ref_channel_01.yaml
+# Reference pipeline (float_ref_channel_01): source -> add -> channelize -> select
+#
+# - FloatValueDataSource(value=...) resolves from runtime context key: value
+# - FloatAddOperation(addend=...) resolves from runtime context key: addend
+# - Channelize/Select use literal channel parameter.
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatAddOperation
+    - processor: FloatChannelizeOperation
+      parameters:
+        channel: "main"
+    - processor: FloatSelectChannelOperation
+      parameters:
+        channel: "main"

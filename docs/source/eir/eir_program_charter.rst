@@ -62,3 +62,14 @@ execution tooling (e.g., MultiChannel/Lane payload behavior), examples/tests MUS
 
 This keeps the series unblocked by tooling gaps while remaining honest about what is
 implemented vs what is demonstrated.
+
+Phase 1 facts (as landed)
+-------------------------
+
+- Core ``MultiChannelDataType`` exists as a ``BaseDataType`` mapping
+  ``channel_name -> BaseDataType``.
+- The reference suite includes a non-drifting channel PoC pipeline,
+  ``float_ref_channel_01`` (scalar -> channel -> scalar) executed under
+  classic runtime tooling.
+- No orchestrator or executor semantics changed; payload boundaries
+  remain ``Payload -> Payload``.
