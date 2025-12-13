@@ -21,6 +21,10 @@ Fixing common SVA errors
 - **SVA104-SVA106**: ``injected_context_keys`` and
   ``suppressed_context_keys`` must be lists of unique strings without
   overlap.
+- **SVA220**: ``DataOperation`` IO can be satisfied either by declaring
+  ``input_data_type`` / ``output_data_type`` in metadata, **or** by annotating
+  ``_process_logic(self, data: <BaseDataType>, ...) -> <BaseDataType>``.
+- **SVA222**: if both declared IO and annotations are present, they must agree.
 
 Probe node contract (mandatory)
 -------------------------------

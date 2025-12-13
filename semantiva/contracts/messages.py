@@ -41,7 +41,14 @@ MESSAGES = {
     "SVA201": "DataSource/PayloadSource should not define `input_data_type` in metadata.",
     "SVA210": "DataSink/PayloadSink must define `input_data_type` in metadata.",
     "SVA211": "DataSink/PayloadSink should not define `output_data_type` in metadata.",
-    "SVA220": "DataOperation must define `input_data_type` and `output_data_type` in metadata.",
+    "SVA220": (
+        "DataOperation must declare both IO types either via metadata (`input_data_type` + "
+        "`output_data_type`) OR via `_process_logic` type annotations (data param + return type)."
+    ),
+    "SVA222": (
+        "DataOperation declared IO disagrees with `_process_logic` annotations: "
+        "declared=({declared_in}->{declared_out}) inferred=({inferred_in}->{inferred_out})."
+    ),
     "SVA221": "Parameters shape invalid for DataOperation.",
     "SVA230": "DataProbe must define `input_data_type` in metadata.",
     "SVA231": "DataProbe should omit `output_data_type` in metadata (pass-through semantics).",

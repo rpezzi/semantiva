@@ -1,42 +1,55 @@
 eir_series:
   name: EIRv1
   series_version: 1
+
   phase_0:
     scaffold:
       epic: P0a
       status: present
       artifacts:
-      - docs/source/eir/eir_program_charter.rst
-      - docs/source/eir/eir_series_status.yaml
-      - semantiva/eir/README.md
-      - tests/eir_reference_suite/float_ref_01.yaml
-      - tests/eir_reference_suite/float_ref_02.yaml
+        - docs/source/eir/eir_program_charter.rst
+        - docs/source/eir/eir_series_status.yaml
+        - semantiva/eir/README.md
+        - tests/eir_reference_suite/float_ref_01.yaml
+        - tests/eir_reference_suite/float_ref_02.yaml
+
+    contracts_io_inference:
+      epic: P0b
+      status: present
+      artifacts:
+        - semantiva/contracts/expectations.py
+        - semantiva/contracts/messages.py
+        - docs/source/contracts.rst
+        - docs/source/contracts_catalog.md
+        - tests/contracts_sva/test_sva220_io_inference.py
+
   reference_suite:
     float:
-    - id: float_ref_01
-      yaml_path: tests/eir_reference_suite/float_ref_01.yaml
-      yaml_sha256: 24366dcfc0d3b726db02d61c0ae53c7f5a7d431307d1ee56ce08a71ed8e6e7df
-      pipeline_id: plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3
-      runtime_contract:
-        initial_context:
-          value: 1.0
-          addend: 2.0
-        expected:
-          data_float: 3.0
-          context_keys_added:
-          - result
-    - id: float_ref_02
-      yaml_path: tests/eir_reference_suite/float_ref_02.yaml
-      yaml_sha256: ecdfe8214c6085c57579b4d2bdaf02c9fa214b8f2a54df1b104eb9e6f82dff7e
-      pipeline_id: plid-dbf8fa82954040c7262e23f3722707f9e7213ae9bf1ceba047198065fc29620e
-      runtime_contract:
-        initial_context:
-          value: 2.0
-          factor: 10.0
-          addend: -1.0
-        expected:
-          data_float: 19.0
-          context_keys_added: []
+      - id: float_ref_01
+        yaml_path: tests/eir_reference_suite/float_ref_01.yaml
+        yaml_sha256: 24366dcfc0d3b726db02d61c0ae53c7f5a7d431307d1ee56ce08a71ed8e6e7df
+        pipeline_id: plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3
+        runtime_contract:
+          initial_context:
+            value: 1.0
+            addend: 2.0
+          expected:
+            data_float: 3.0
+            context_keys_added: [result]
+
+      - id: float_ref_02
+        yaml_path: tests/eir_reference_suite/float_ref_02.yaml
+        yaml_sha256: ecdfe8214c6085c57579b4d2bdaf02c9fa214b8f2a54df1b104eb9e6f82dff7e
+        pipeline_id: plid-dbf8fa82954040c7262e23f3722707f9e7213ae9bf1ceba047198065fc29620e
+        runtime_contract:
+          initial_context:
+            value: 2.0
+            factor: 10.0
+            addend: -1.0
+          expected:
+            data_float: 19.0
+            context_keys_added: []
+
   last_updated:
-    epic: P0a
-    date: '2025-12-13'
+    epic: P0b
+    date: "2025-12-13"

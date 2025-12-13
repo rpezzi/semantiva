@@ -17,7 +17,8 @@
 | SVA201 | warn | DataSource / PayloadSource (component) | Forbid input_data_type | Metadata has input_data_type | Remove it |
 | SVA210 | error | DataSink / PayloadSink (component) | Require input_data_type | Metadata lacks input_data_type | Add method/meta |
 | SVA211 | warn | DataSink / PayloadSink (component) | Forbid output_data_type | Metadata has output_data_type | Remove it |
-| SVA220 | error | DataOperation (component) | Require both input & output | One or both missing | Add both |
+| SVA220 | error | DataOperation (component) | Require IO (declared or inferable) | Missing both declared IO and inferable IO | Declare input/output in metadata OR annotate `_process_logic` (data + return). |
+| SVA222 | error | DataOperation (component) | Declared IO matches annotations | Declared IO != inferred IO | Align metadata IO with `_process_logic` annotations. |
 | SVA221 | error | DataOperation (component) | Parameters shape valid | Same validator as SVA103 | Fix params |
 | SVA230 | error | DataProbe (component) | Require input_data_type | Missing input | Add method/meta |
 | SVA231 | warn | DataProbe (component) | Discourage output_data_type | Has output | Remove it (node enforces pass-through) |

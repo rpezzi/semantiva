@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# ruff: noqa: E402
+
 """Update the EIRv1 series ledger with deterministic reference-suite hashes.
 
 Usage:
@@ -41,7 +43,10 @@ LEDGER_PATH = REPO_ROOT / "docs" / "source" / "eir" / "eir_series_status.yaml"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from semantiva.pipeline.graph_builder import build_canonical_spec, compute_pipeline_id  # noqa: E402
+from semantiva.pipeline.graph_builder import (
+    build_canonical_spec,
+    compute_pipeline_id,
+)  # noqa: E402
 
 
 def sha256_file(path: Path) -> str:
@@ -63,7 +68,9 @@ def update_float_suite(data: Dict[str, Any]) -> List[str]:
 
     for entry in suite:
         if not isinstance(entry, dict) or "yaml_path" not in entry or "id" not in entry:
-            raise ValueError("each float reference entry must be a mapping with 'id' and 'yaml_path'")
+            raise ValueError(
+                "each float reference entry must be a mapping with 'id' and 'yaml_path'"
+            )
         yaml_path = REPO_ROOT / str(entry["yaml_path"])
         if not yaml_path.exists():
             raise FileNotFoundError(f"reference yaml_path not found: {yaml_path}")
@@ -78,8 +85,14 @@ def update_float_suite(data: Dict[str, Any]) -> List[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true", help="fail if ledger differs from computed values")
-    ap.add_argument("--write", action="store_true", help="rewrite ledger with computed values")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="fail if ledger differs from computed values",
+    )
+    ap.add_argument(
+        "--write", action="store_true", help="rewrite ledger with computed values"
+    )
     args = ap.parse_args()
 
     if not LEDGER_PATH.exists():
@@ -94,7 +107,9 @@ def main() -> int:
 
     if args.check:
         if rendered != original:
-            print("Ledger differs from computed values. Re-run with --write and commit the result.")
+            print(
+                "Ledger differs from computed values. Re-run with --write and commit the result."
+            )
             return 1
         print(f"OK: ledger matches computed values for: {', '.join(updated_ids)}")
         return 0

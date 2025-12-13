@@ -28,7 +28,17 @@ Update RULES here once; all tools stay in sync.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    get_args,
+    get_origin,
+)
 import inspect
 import importlib
 import importlib.util
@@ -36,6 +46,7 @@ import os
 import pkgutil
 import pathlib
 import sys
+import typing
 
 from .messages import MESSAGES
 
@@ -129,6 +140,80 @@ def _list_unique_str(val: Any) -> bool:
         and all(isinstance(x, str) for x in val)
         and len(val) == len(set(val))
     )
+
+
+def _safe_issubclass(x: object, base: type) -> bool:
+    try:
+        return isinstance(x, type) and issubclass(x, base)
+    except Exception:
+        return False
+
+
+def _normalize_datatype_annotation(ann: object) -> Optional[type]:
+    """
+    Best-effort normalize an annotation to a concrete BaseDataType subclass.
+
+    Accepts:
+      - Concrete classes: FloatDataType
+      - Optional[T] / Union[T, None] where T is a concrete BaseDataType subclass
+    Rejects:
+      - Any, TypeVar, Generic aliases, ambiguous unions, missing annotations
+    """
+
+    if ann is None or ann is inspect._empty:
+        return None
+    if ann is typing.Any:
+        return None
+
+    origin = get_origin(ann)
+    if origin is None:
+        return ann if isinstance(ann, type) else None
+
+    if origin is typing.Union:
+        args = [a for a in get_args(ann) if a is not type(None)]  # noqa: E721
+        concrete = [a for a in args if isinstance(a, type)]
+        if len(concrete) == 1:
+            return concrete[0]
+        return None
+
+    return None
+
+
+def _infer_dataoperation_io_from_process_logic(
+    cls: type,
+) -> Tuple[Optional[type], Optional[type]]:
+    fn = getattr(cls, "_process_logic", None)
+    if fn is None:
+        return (None, None)
+
+    try:
+        module = importlib.import_module(cls.__module__)
+        hints = typing.get_type_hints(
+            fn, globalns=vars(module), localns=dict(vars(cls))
+        )
+    except Exception:
+        hints = getattr(fn, "__annotations__", {}) or {}
+
+    try:
+        sig = inspect.signature(fn)
+    except Exception:
+        sig = None
+
+    data_param = sig.parameters.get("data") if sig else None
+    in_ann = hints.get("data", data_param.annotation if data_param else None)
+    out_ann = hints.get("return", sig.return_annotation if sig else None)
+
+    from semantiva.data_types import BaseDataType  # local import to avoid cycles
+
+    in_t = _normalize_datatype_annotation(in_ann)
+    out_t = _normalize_datatype_annotation(out_ann)
+
+    if not _safe_issubclass(in_t, BaseDataType):
+        in_t = None
+    if not _safe_issubclass(out_t, BaseDataType):
+        out_t = None
+
+    return (in_t, out_t)
 
 
 # ------------------------------ Rule checks --------------------------------
@@ -386,10 +471,53 @@ def _r_sink_forbid_output(cls: type, md: Optional[dict]) -> List[Diagnostic]:
 def _r_operation_require_both(cls: type, md: Optional[dict]) -> List[Diagnostic]:
     if not isinstance(md, dict):
         return []
-    if md.get("component_type") == "DataOperation" and (
-        "input_data_type" not in md or "output_data_type" not in md
-    ):
+    if md.get("component_type") != "DataOperation":
+        return []
+
+    declared_in = md.get("input_data_type")
+    declared_out = md.get("output_data_type")
+    has_declared_both = declared_in is not None and declared_out is not None
+
+    inferred_in_t, inferred_out_t = _infer_dataoperation_io_from_process_logic(cls)
+    has_inferred_both = inferred_in_t is not None and inferred_out_t is not None
+
+    if not has_declared_both and not has_inferred_both:
         return [_diag("SVA220", "error", cls, {})]
+    return []
+
+
+def _r_operation_declared_matches_inferred(
+    cls: type, md: Optional[dict]
+) -> List[Diagnostic]:
+    if not isinstance(md, dict):
+        return []
+    if md.get("component_type") != "DataOperation":
+        return []
+
+    declared_in = md.get("input_data_type")
+    declared_out = md.get("output_data_type")
+
+    inferred_in_t, inferred_out_t = _infer_dataoperation_io_from_process_logic(cls)
+    inferred_in = inferred_in_t.__name__ if inferred_in_t else None
+    inferred_out = inferred_out_t.__name__ if inferred_out_t else None
+
+    # Only enforce mismatch when both sides are available to avoid noisy errors.
+    if (declared_in and inferred_in and declared_in != inferred_in) or (
+        declared_out and inferred_out and declared_out != inferred_out
+    ):
+        return [
+            _diag(
+                "SVA222",
+                "error",
+                cls,
+                {
+                    "declared_in": declared_in or "?",
+                    "declared_out": declared_out or "?",
+                    "inferred_in": inferred_in or "?",
+                    "inferred_out": inferred_out or "?",
+                },
+            )
+        ]
     return []
 
 
@@ -1121,12 +1249,22 @@ RULES += [
     RuleSpec(
         "SVA220",
         "error",
-        "Require both input & output",
+        "Require IO (declared or inferable)",
         "DataOperation (component)",
         "SVA220",
-        "Add both",
-        "One or both missing",
+        "Declare input/output in metadata OR annotate `_process_logic` (data + return).",
+        "Missing both declared IO and inferable IO",
         _r_operation_require_both,
+    ),
+    RuleSpec(
+        "SVA222",
+        "error",
+        "Declared IO matches annotations",
+        "DataOperation (component)",
+        "SVA222",
+        "Align metadata IO with `_process_logic` annotations.",
+        "Declared IO != inferred IO",
+        _r_operation_declared_matches_inferred,
     ),
     RuleSpec(
         "SVA221",
