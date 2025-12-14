@@ -23,7 +23,7 @@ from .parameter_resolver_registry import (
 )
 from .plugin_registry import SemantivaExtension, load_extensions
 from .processor_registry import ProcessorRegistry
-from .resolve import UnknownProcessorError, resolve_symbol
+from .resolve import UnknownProcessorError, AmbiguousProcessorError, resolve_symbol
 
 # Ensure built-in resolvers are installed at import time.
 register_builtin_resolvers()
@@ -36,6 +36,7 @@ __all__ = [
     "resolve_parameters",
     "resolve_symbol",
     "UnknownProcessorError",
+    "AmbiguousProcessorError",
     "SemantivaExtension",
     "load_extensions",
     "RegistryProfile",

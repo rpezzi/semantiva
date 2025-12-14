@@ -44,6 +44,7 @@ class ProcessorRegistry:
     """
 
     _processors: Dict[str, type[Any]] = {}
+    _name_candidates: Dict[str, Set[str]] = {}
     _registered_modules: Set[str] = set()
     _module_history: list[str] = []
     _defaults_loaded: bool = False
@@ -65,6 +66,7 @@ class ProcessorRegistry:
         """Reset the registry (primarily for tests)."""
 
         cls._processors.clear()
+        cls._name_candidates.clear()
         cls._registered_modules.clear()
         cls._module_history.clear()
 
@@ -76,13 +78,28 @@ class ProcessorRegistry:
 
     @classmethod
     def register_processor(cls, name: str, proc_cls: type[Any]) -> None:
-        """Register a processor class under a canonical name."""
+        """Register a processor class under a canonical name.
+
+        Registration is idempotent: re-registering the same class (same FQCN)
+        under the same name does not trigger ambiguity.
+        """
 
         if not isinstance(name, str) or not name:
             raise ValueError("Processor name must be a non-empty string")
         if not isinstance(proc_cls, type):
             raise TypeError("proc_cls must be a type")
-        cls._processors[name] = proc_cls
+
+        # Track FQCN candidates for ambiguity detection
+        fqcn = f"{proc_cls.__module__}.{proc_cls.__qualname__}"
+        cls._name_candidates.setdefault(name, set()).add(fqcn)
+
+        # Only register if this is the first/sole candidate (idempotent for same FQCN).
+        # If ambiguous (2+ distinct FQCNs), we store it for backward debugging but
+        # get_processor() will error deterministically based on candidate cardinality.
+        if len(cls._name_candidates[name]) == 1:
+            cls._processors[name] = proc_cls
+        else:
+            cls._processors.setdefault(name, proc_cls)
 
     @classmethod
     def register_modules(cls, modules: Iterable[str] | str) -> None:
@@ -112,11 +129,26 @@ class ProcessorRegistry:
 
     @classmethod
     def get_processor(cls, name: str) -> type[Any]:
-        """Retrieve a registered processor class by name."""
+        """Retrieve a registered processor class by name.
+
+        Raises AmbiguousProcessorError if the name maps to multiple candidates.
+        """
+        from .resolve import AmbiguousProcessorError
+
+        cands = cls._name_candidates.get(name)
+        if cands and len(cands) > 1:
+            raise AmbiguousProcessorError(
+                f"Ambiguous processor name {name!r}: {sorted(cands)}"
+            )
         try:
             return cls._processors[name]
         except KeyError as exc:  # pragma: no cover - handled by resolve_symbol
             raise KeyError(f"Unknown processor '{name}'") from exc
+
+    @classmethod
+    def get_candidates(cls, name: str) -> list[str]:
+        """Return sorted list of FQCNs for a processor name."""
+        return sorted(cls._name_candidates.get(name, set()))
 
     @classmethod
     def all_processors(cls) -> Dict[str, type[Any]]:

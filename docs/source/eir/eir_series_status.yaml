@@ -145,6 +145,36 @@ eir_series:
         - "Adds Python peer frontend inputs for scalar reference suite."
         - "Smoke coverage: legacy execution and EIR scalar harness both run from Python specs."
         - "No canonical-spec parity claims yet (FP0b/FP0c)."
+    fp0a1_processor_ref_resolution:
+      epic: FP0a1
+      status: present
+      date: "2025-12-14"
+      artifacts:
+        - semantiva/registry/resolve.py
+        - semantiva/registry/processor_registry.py
+        - tests/eir_frontend_parity/test_processor_ref_resolution_contract.py
+      notes:
+        - "Hardens processor reference resolution with dotted-FQN support."
+        - "Ambiguous short-name resolution errors deterministically with fix instructions."
+        - "Enables canonical ProcessorRefV1 contract for frontend parity."
+      gates:
+        - "Dotted-FQN resolution works"
+        - "Ambiguous short-name resolution errors deterministically with fix instructions"
+    fp0a2_processor_registry_stability:
+      epic: FP0a2
+      status: present
+      date: "2025-12-14"
+      artifacts:
+        - semantiva/registry/processor_registry.py
+        - semantiva/registry/resolve.py
+        - tests/eir_frontend_parity/test_processor_ref_resolution_contract.py
+      notes:
+        - "Makes register_processor idempotent for same FQCN (no false ambiguity on reload)."
+        - "Registers safe alias keyed by dotted-FQN string (enables stable repeated resolution)."
+        - "Preserves short-name workflows; ambiguity still errors deterministically."
+      gates:
+        - "Short-name re-registration is idempotent"
+        - "Dotted-FQN resolution registers stable alias key"
   reference_suite:
     float:
     - id: float_ref_01
