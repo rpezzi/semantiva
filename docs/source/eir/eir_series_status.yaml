@@ -120,6 +120,18 @@ eir_series:
       notes:
         - "Parity validation: legacy classic scalar execution vs EIR scalar execution (float_ref_01, float_ref_02)."
         - "Parity defined as data equality + context equality, no runtime switch."
+    r0c_execution_path_selection_opt_in:
+      epic: R0c
+      status: present
+      date: "2025-12-14"
+      artifacts:
+        - semantiva/eir/runtime.py
+        - semantiva/execution/orchestrator/orchestrator.py
+        - tests/eir_runtime/test_orchestrator_eir_opt_in.py
+        - tests/eir_runtime/test_trace_equivalence_opt_in_scalar.py
+      notes:
+        - "Adds opt-in execution_backend selector; default remains legacy."
+        - "EIR path is scalar-only classic_linear via R0a harness; parity proven in R0b."
   reference_suite:
     float:
     - id: float_ref_01
@@ -182,5 +194,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: R0b
+    epic: R0c
     date: '2025-12-14'

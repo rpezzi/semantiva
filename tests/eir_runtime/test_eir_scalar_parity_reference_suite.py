@@ -19,7 +19,9 @@ def _repo_root() -> Path:
 
 def _run_legacy_from_yaml(spec_path: Path, payload: Payload) -> Payload:
     raw = yaml.safe_load(spec_path.read_text(encoding="utf-8")) or {}
-    cfg = parse_pipeline_config(raw, source_path=str(spec_path), base_dir=spec_path.parent)
+    cfg = parse_pipeline_config(
+        raw, source_path=str(spec_path), base_dir=spec_path.parent
+    )
     pipe = Pipeline(cfg.nodes)
     return pipe.process(payload)
 
@@ -52,7 +54,9 @@ def test_parity_float_ref_01_legacy_vs_eir() -> None:
 
 def test_parity_float_ref_02_legacy_vs_eir() -> None:
     spec = _repo_root() / "tests" / "eir_reference_suite" / "float_ref_02.yaml"
-    payload = Payload(NoDataType(), ContextType({"value": 2.0, "factor": 10.0, "addend": -1.0}))
+    payload = Payload(
+        NoDataType(), ContextType({"value": 2.0, "factor": 10.0, "addend": -1.0})
+    )
 
     legacy_out = _run_legacy_from_yaml(spec, payload)
     eir_out = _run_eir_from_yaml(spec, payload)

@@ -25,7 +25,17 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Callable, Iterable, List, Optional, Sequence, TypeVar, cast
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    TypeVar,
+    cast,
+)
 
 from semantiva.data_processors.data_processors import ParameterInfo, _NO_DEFAULT
 from semantiva.execution.executor.executor import (
@@ -98,18 +108,25 @@ class SemantivaOrchestrator(ABC):
     # ------------------------------------------------------------------
     def execute(
         self,
-        pipeline_spec: List[dict[str, Any]],
+        pipeline_spec: list[dict[str, Any]] | str,
         payload: Payload,
         transport: SemantivaTransport,
         logger: Logger,
         trace: TraceDriver | None = None,
         canonical_spec: dict[str, Any] | None = None,
         run_metadata: dict[str, Any] | None = None,
+        *,
+        execution_backend: Literal["legacy", "eir_scalar"] = "legacy",
     ) -> Payload:
         """Run the pipeline and emit SER records via the template method.
 
         For behaviour details (checks, IO delta, timing, env pins), refer to
         docs/source/execution.rst and docs/source/ser.rst.
+
+        execution_backend controls routing:
+          - "legacy" (default): existing orchestrator execution path
+          - "eir_scalar": opt-in path that compiles the provided YAML pipeline into
+            EIRv1 and executes the classic_linear scalar plan
         """
 
         data = payload.data
@@ -122,9 +139,31 @@ class SemantivaOrchestrator(ABC):
         self._current_run_metadata = dict(pending_meta or {})
 
         canonical = canonical_spec
-        resolved_spec: Sequence[dict[str, Any]] = pipeline_spec
-        if canonical is None:
-            canonical, resolved_spec = build_canonical_spec(pipeline_spec)
+        resolved_spec: Sequence[dict[str, Any]] | None = None
+        if execution_backend == "legacy":
+            if canonical is None:
+                canonical, resolved_spec = build_canonical_spec(pipeline_spec)
+            else:
+                resolved_spec = (
+                    pipeline_spec
+                    if isinstance(pipeline_spec, Sequence)
+                    and not isinstance(pipeline_spec, (str, bytes))
+                    else []
+                )
+        elif execution_backend == "eir_scalar":
+            if not isinstance(pipeline_spec, str):
+                raise TypeError(
+                    "eir_scalar execution backend requires pipeline_spec to be a YAML path string"
+                )
+
+            from semantiva.eir.runtime import build_scalar_specs_from_yaml
+
+            canonical, resolved_spec = build_scalar_specs_from_yaml(pipeline_spec)
+        else:
+            raise ValueError(f"Unknown execution_backend: {execution_backend}")
+
+        if canonical is None or resolved_spec is None:
+            raise RuntimeError("Failed to resolve pipeline specification for execution")
 
         run_id: str | None = None
         pipeline_id: str | None = None
