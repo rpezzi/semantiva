@@ -54,8 +54,13 @@ def execute_eir_v1_scalar_plan(
     if isinstance(exts, list) and all(isinstance(x, str) for x in exts):
         try:
             load_extensions(exts)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Fail fast: do not continue execution when declared extensions
+            # cannot be loaded. Preserve original exception as __cause__ for
+            # diagnostics and raise a clear EIRExecutionError.
+            raise EIRExecutionError(
+                f"execute_eir_v1_scalar_plan: failed to load extensions {exts!r} from eir.source.extensions"
+            ) from exc
 
     sem = eir.get("semantics") or {}
     forms = sem.get("payload_forms") or {}
