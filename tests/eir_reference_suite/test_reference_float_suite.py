@@ -82,6 +82,13 @@ REF_CASES: List[RefCase] = [
         expected_data_float=3.0,
         expected_added_context_keys=[],
     ),
+    RefCase(
+        ref_id="float_ref_lane_01",
+        yaml_path=SUITE_DIR / "float_ref_lane_01.yaml",
+        initial_context={"lane_values": {"a": 1.0, "b": 2.0}, "addend": 0.5},
+        expected_data_float=2.5,
+        expected_added_context_keys=[],
+    ),
 ]
 
 

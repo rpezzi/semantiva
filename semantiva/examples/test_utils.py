@@ -18,7 +18,14 @@ Provides helpers for validating expected behavior in pipeline tests.
 """
 
 # This file contains utility classes for testing the semantiva package.
-from semantiva.data_types import BaseDataType, DataCollectionType, MultiChannelDataType
+from typing import Any
+
+from semantiva.data_types import (
+    BaseDataType,
+    DataCollectionType,
+    LaneBundleDataType,
+    MultiChannelDataType,
+)
 from semantiva.data_processors import DataOperation, DataProbe
 from semantiva.data_io import DataSource, PayloadSource, DataSink, PayloadSink
 from semantiva.pipeline import Payload
@@ -258,6 +265,90 @@ class FloatValueDataSource(DataSource):
     def output_data_type(cls):
         """Return the data type produced by this source."""
         return FloatDataType
+
+
+class FloatLaneBundleFromContextSource(DataSource):
+    """Outputs a LaneBundleDataType from a context-provided mapping lane->float."""
+
+    @classmethod
+    def _get_data(cls, lane_values: dict[str, float]) -> LaneBundleDataType:
+        assert isinstance(lane_values, dict), "lane_values must be a dict[str, float]"
+        out: dict[str, BaseDataType[Any]] = {}
+        for k, v in lane_values.items():
+            if not isinstance(k, str) or not k:
+                raise TypeError("lane_values keys must be non-empty str")
+            if not isinstance(v, float):
+                raise TypeError("lane_values values must be float")
+            out[k] = FloatDataType(v)
+        return LaneBundleDataType(out)
+
+    @classmethod
+    def output_data_type(cls):
+        return LaneBundleDataType
+
+
+class FloatLaneMapAddOperation(DataOperation):
+    """Apply an addend to each FloatDataType lane element (lane_map PoC)."""
+
+    @classmethod
+    def input_data_type(cls):
+        return LaneBundleDataType
+
+    @classmethod
+    def output_data_type(cls):
+        return LaneBundleDataType
+
+    def _process_logic(
+        self, data: LaneBundleDataType, addend: float
+    ) -> LaneBundleDataType:
+        if not isinstance(addend, float):
+            raise TypeError("addend must be float")
+        out: dict[str, BaseDataType] = {}
+        for lane in data.keys():
+            elem = data.get(lane)
+            if not isinstance(elem, FloatDataType):
+                raise TypeError(
+                    "FloatLaneMapAddOperation expects FloatDataType lane elements"
+                )
+            out[lane] = FloatDataType(elem.data + addend)
+        return LaneBundleDataType(out)
+
+
+class LaneMergeToMultiChannelOperation(DataOperation):
+    """Merge LaneBundleDataType into MultiChannelDataType (lane_merge PoC)."""
+
+    @classmethod
+    def input_data_type(cls):
+        return LaneBundleDataType
+
+    @classmethod
+    def output_data_type(cls):
+        return MultiChannelDataType
+
+    def _process_logic(
+        self,
+        data: LaneBundleDataType,
+        channel_map: dict[str, str] | None = None,
+        prefix: str = "",
+    ) -> MultiChannelDataType:
+        if channel_map is not None and not isinstance(channel_map, dict):
+            raise TypeError("channel_map must be dict[str,str] or None")
+        if not isinstance(prefix, str):
+            raise TypeError("prefix must be str")
+
+        out: dict[str, BaseDataType] = {}
+        for lane in data.keys():
+            ch = None
+            if channel_map is not None:
+                mapped = channel_map.get(lane)
+                if mapped is not None:
+                    if not isinstance(mapped, str) or not mapped:
+                        raise TypeError("channel_map values must be non-empty str")
+                    ch = mapped
+            if ch is None:
+                ch = f"{prefix}{lane}"
+            out[ch] = data.get(lane)
+        return MultiChannelDataType(out)
 
 
 class FloatValueDataSourceWithDefault(DataSource):

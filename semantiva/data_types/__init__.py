@@ -21,7 +21,14 @@ from .data_types import (
     BaseDataType,
     DataCollectionType,
     MultiChannelDataType,
+    LaneBundleDataType,
     NoDataType,
 )
 
-__all__ = ["BaseDataType", "DataCollectionType", "MultiChannelDataType", "NoDataType"]
+__all__ = [
+    "BaseDataType",
+    "DataCollectionType",
+    "MultiChannelDataType",
+    "LaneBundleDataType",
+    "NoDataType",
+]

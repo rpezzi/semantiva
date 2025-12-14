@@ -1,0 +1,14 @@
+# Reference pipeline (float_ref_lane_01):
+# source(lane_values) -> lane_map(addend) -> lane_merge(prefix="") -> select(channel="b")
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatLaneBundleFromContextSource
+    - processor: FloatLaneMapAddOperation
+    - processor: LaneMergeToMultiChannelOperation
+      parameters:
+        prefix: ""
+    - processor: FloatSelectChannelOperation
+      parameters:
+        channel: "b"

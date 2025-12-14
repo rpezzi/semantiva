@@ -296,3 +296,37 @@ class MultiChannelDataType(BaseDataType[dict[str, "BaseDataType[Any]"]]):
         updated = dict(self._data)
         updated[channel] = value
         return MultiChannelDataType(updated)
+
+
+class LaneBundleDataType(BaseDataType[dict[str, "BaseDataType[Any]"]]):
+    """A mapping of lane key -> BaseDataType.
+
+    Phase-1 PoC: this is a pure data-model construct for LaneBundle payload algebra.
+    """
+
+    def validate(self, data: dict[str, "BaseDataType[Any]"]) -> bool:
+        if not isinstance(data, dict):
+            raise TypeError("LaneBundleDataType data must be a dict[str, BaseDataType]")
+        for key, value in data.items():
+            if not isinstance(key, str) or not key:
+                raise TypeError("LaneBundleDataType keys must be non-empty str")
+            if not isinstance(value, BaseDataType):
+                raise TypeError(
+                    "LaneBundleDataType values must be BaseDataType instances"
+                )
+        return True
+
+    def keys(self) -> list[str]:
+        return list(self._data.keys())
+
+    def get(self, lane: str) -> "BaseDataType[Any]":
+        return self._data[lane]
+
+    def with_lane(self, lane: str, value: "BaseDataType[Any]") -> "LaneBundleDataType":
+        if not isinstance(lane, str) or not lane:
+            raise TypeError("lane must be a non-empty str")
+        if not isinstance(value, BaseDataType):
+            raise TypeError("value must be a BaseDataType instance")
+        updated = dict(self._data)
+        updated[lane] = value
+        return LaneBundleDataType(updated)

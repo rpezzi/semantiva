@@ -79,3 +79,11 @@ Phase 1 facts (as landed)
 - The reference suite includes a non-drifting multi-input PoC pipeline,
   ``float_ref_slots_01`` (source -> add_two_inputs) executed under classic runtime
   tooling via context injection for the secondary ``FloatDataType``.
+- Core ``LaneBundleDataType`` exists as a ``BaseDataType`` mapping
+  ``lane_key -> BaseDataType`` (Phase 1 PoC data-model).
+- The reference suite includes a non-drifting lane bundle PoC pipeline,
+  ``float_ref_lane_01`` (lane_bundle -> lane_map -> merge -> select) executed
+  under classic runtime tooling with no orchestrator/executor semantic changes.
+- Safety rule (Phase 1): LaneBundle semantics are demonstrated in the payload
+  data-plane first; lane elements are carried in ``payload.data`` and not stored
+  as ``BaseDataType`` objects in context.

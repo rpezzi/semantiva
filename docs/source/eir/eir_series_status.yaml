@@ -68,6 +68,19 @@ eir_series:
         expected:
           data_float: 3.0
           context_keys_added: []
+    - id: float_ref_lane_01
+      yaml_path: tests/eir_reference_suite/float_ref_lane_01.yaml
+      yaml_sha256: a801419b24edbae9440e51dd8558c7f9339c1b15464d4aea2198f1cfdcd8df03
+      pipeline_id: plid-5e25e7a153ea053946caf69160744c53649be5836c437789ff5f7d912e646cbc
+      runtime_contract:
+        initial_context:
+          lane_values:
+            a: 1.0
+            b: 2.0
+          addend: 0.5
+        expected:
+          data_float: 2.5
+          context_keys_added: []
   last_updated:
-    epic: P2
+    epic: P3
     date: '2025-12-14'
