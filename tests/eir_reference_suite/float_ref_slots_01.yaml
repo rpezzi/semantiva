@@ -1,0 +1,10 @@
+# Reference pipeline (float_ref_slots_01): source -> add_two_inputs
+#
+# Demonstrates a multi-input `_process_logic` signature. The secondary input
+# (`other: FloatDataType`) is supplied via runtime context injection (existing mechanism).
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatAddTwoInputsOperation

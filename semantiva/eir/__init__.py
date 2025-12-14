@@ -18,3 +18,5 @@ Phase 0 note:
 - This package is a **stub namespace** used to reserve canonical paths for the
   EIRv1 series. It intentionally contains no schema/compiler/runtime behavior.
 """
+
+from .slot_inference import SlotInference, infer_data_slots  # noqa: F401

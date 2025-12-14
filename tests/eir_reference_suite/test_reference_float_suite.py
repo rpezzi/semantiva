@@ -30,6 +30,7 @@ from semantiva.context_processors import ContextType
 from semantiva.data_types import NoDataType
 from semantiva.pipeline import Pipeline
 from semantiva.pipeline.graph_builder import build_canonical_spec, compute_pipeline_id
+from semantiva.examples.test_utils import FloatDataType
 from semantiva.trace.drivers.jsonl import JsonlTraceDriver
 
 try:
@@ -72,6 +73,13 @@ REF_CASES: List[RefCase] = [
         yaml_path=SUITE_DIR / "float_ref_channel_01.yaml",
         initial_context={"value": 1.5, "addend": 0.5},
         expected_data_float=2.0,
+        expected_added_context_keys=[],
+    ),
+    RefCase(
+        ref_id="float_ref_slots_01",
+        yaml_path=SUITE_DIR / "float_ref_slots_01.yaml",
+        initial_context={"value": 1.0, "other": FloatDataType(2.0)},
+        expected_data_float=3.0,
         expected_added_context_keys=[],
     ),
 ]

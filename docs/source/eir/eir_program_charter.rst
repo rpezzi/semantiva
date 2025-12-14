@@ -73,3 +73,9 @@ Phase 1 facts (as landed)
   classic runtime tooling.
 - No orchestrator or executor semantics changed; payload boundaries
   remain ``Payload -> Payload``.
+- Core slot inference utility exists (metadata-only): it can extract data slot
+  candidates from ``_process_logic`` type annotations (including multi-input
+  signatures).
+- The reference suite includes a non-drifting multi-input PoC pipeline,
+  ``float_ref_slots_01`` (source -> add_two_inputs) executed under classic runtime
+  tooling via context injection for the secondary ``FloatDataType``.

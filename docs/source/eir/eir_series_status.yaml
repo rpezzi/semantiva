@@ -57,6 +57,17 @@ eir_series:
         expected:
           data_float: 2.0
           context_keys_added: []
+    - id: float_ref_slots_01
+      yaml_path: tests/eir_reference_suite/float_ref_slots_01.yaml
+      yaml_sha256: 629c53586857ce190276fa51a3d423be538afe3e101dc4906aabfe0cd8216202
+      pipeline_id: plid-cc88682c597f0eebe6c34653b114665645b331218bf343171955908be6f3b79c
+      runtime_contract:
+        initial_context:
+          value: 1.0
+          other: FloatDataType(2.0) via test harness injection
+        expected:
+          data_float: 3.0
+          context_keys_added: []
   last_updated:
-    epic: P1
-    date: '2025-12-13'
+    epic: P2
+    date: '2025-12-14'

@@ -147,6 +147,17 @@ class FloatAddOperation(FloatOperation):
         return FloatDataType(data.data + addend)
 
 
+class FloatAddTwoInputsOperation(FloatOperation):
+    """Add two FloatDataType inputs (primary ``data`` and secondary ``other``)."""
+
+    def _process_logic(
+        self, data: FloatDataType, other: FloatDataType
+    ) -> FloatDataType:
+        if not isinstance(other, FloatDataType):
+            raise TypeError("other must be a FloatDataType instance")
+        return FloatDataType(data.data + other.data)
+
+
 class FloatChannelizeOperation(DataOperation):
     """Wrap a FloatDataType into a single-channel MultiChannelDataType."""
 
