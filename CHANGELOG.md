@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1 C0: added EIRv1 schema skeleton and classic pipeline compiler (`compile_eir_v1`) with determinism + schema-validation tests (no runtime execution changes).
 - EIRv1 C1: compiler emits schema-valid deterministic semantics (payload forms + slot candidates) for Phase-1 PoC pipelines; no runtime execution changes.
 - EIRv1 C1a: added `semantiva.eir.validate_eir_v1` helper for packaged-schema validation, and documented ledger historical snapshot semantics + `classic_linear` runtime mapping guidance for Phase 3.
+- EIRv1 Phase 3 R0a: added internal `execute_eir_v1_scalar_plan(...)` harness for classic scalar EIR execution (classic_linear only), carrying runtime-only extensions/context_key metadata under `eir.source`.
+- EIRv1 Phase 3 R0a-demo: added in-process developer demo for executing `float_ref_01` via the EIR scalar execution harness, with a regression test to ensure stability.
 
 
 ## [v0.5.1] - Unreleased

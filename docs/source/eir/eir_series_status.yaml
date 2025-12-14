@@ -88,6 +88,27 @@ eir_series:
             pipeline_id: "plid-5e25e7a153ea053946caf69160744c53649be5836c437789ff5f7d912e646cbc"
             pipeline_variant_id: "pvid-c923fbf9200928a5953c1aaf6b16cbe8877c196d25042c1fd2d653bd4c84fbc5"
             eir_id: "eirid-e181e9b096e58e9466378ea08e34b5cf2569d97e1e964458a800427e817faa9c"
+  phase_3:
+    r0a_eir_scalar_execution_harness:
+      epic: R0a
+      status: present
+      artifacts:
+        - semantiva/eir/execution_scalar.py
+        - semantiva/eir/compiler.py
+        - tests/eir_runtime/test_execute_eir_scalar_reference_suite.py
+      notes:
+        - "Internal-only EIR execution for classic scalar plans (classic_linear), no parity, no switch."
+        - "Runtime-only probe context_key and YAML extensions are carried under eir.source (excluded from eir_id)."
+    r0a_demo_in_process_example:
+      epic: R0a-demo
+      status: present
+      artifacts:
+        - examples/eir/run_float_ref_01_in_process.py
+        - examples/eir/README.md
+        - tests/eir_runtime/test_eir_examples_demo_runs.py
+      notes:
+        - "Developer-facing, in-process example for executing float_ref_01 via EIR scalar harness."
+        - "Regression test ensures demo remains runnable and stable across refactoring."
   reference_suite:
     float:
     - id: float_ref_01
@@ -150,5 +171,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: C1
+    epic: R0a-demo
     date: '2025-12-14'

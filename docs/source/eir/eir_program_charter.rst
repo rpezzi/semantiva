@@ -136,3 +136,10 @@ direct analogue of Semantiva's current classic pipeline execution:
 
 This mapping provides a stable baseline for the first execution-from-EIR milestone while
 preserving Phase 2's constraint: **no runtime behavior changes**.
+
+Phase 3 runtime (R0a harness)
+-----------------------------
+
+Phase 3 (runtime): R0a introduces an internal harness that can execute a classic scalar pipeline
+from an EIRv1 document (classic_linear only). This does not change default execution paths and
+does not assert parity; it exists to prove EIR-backed execution is mechanically feasible.

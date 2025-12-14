@@ -361,5 +361,29 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
         "lineage": {},
     }
 
+    runtime_extensions: list[str] = []
+    if isinstance(pipeline_or_spec, str):
+        try:
+            raw = (
+                Path(pipeline_or_spec).read_text(encoding="utf-8")
+                if Path(pipeline_or_spec).exists()
+                else pipeline_or_spec
+            )
+            doc = yaml.safe_load(raw)
+            runtime_extensions = _extract_extensions(doc)
+        except Exception:
+            runtime_extensions = []
+
+    node_runtime: dict[str, dict[str, Any]] = {}
+    for node_canon, node_resolved in zip(canonical_graph["nodes"], resolved_nodes):
+        node_uuid = str(node_canon["node_uuid"])
+        ck = node_resolved.get("context_key")
+        if isinstance(ck, str) and ck.strip():
+            node_runtime.setdefault(node_uuid, {})["context_key"] = ck
+
+    eir["source"]["extensions"] = runtime_extensions
+    if node_runtime:
+        eir["source"]["node_runtime"] = node_runtime
+
     eir["identity"]["eir_id"] = compute_eir_id(eir)
     return eir
