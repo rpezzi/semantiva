@@ -93,6 +93,8 @@ Phase 2 facts (as landed)
 
 - EIRv1 schema skeleton exists: ``semantiva/eir/schema/eir_v1.schema.json``.
 - Classic pipelines can be compiled to an EIRv1 document via ``semantiva.eir.compile_eir_v1``.
-- The compiled EIR is schema-validated in CI, and ``eir_id`` is deterministic across compiles
-  (it excludes ephemeral build/source metadata such as timestamps).
+- The compiled EIR is schema-validated in CI.
+- ``eir_id`` is deterministic across compiles and is computed from a canonical subset that:
+  - includes: ``graph``, ``parameters``, ``plan``, ``semantics``, ``lineage``
+  - excludes: ephemeral ``build``/``source`` metadata (timestamps, environment drift)
 - No runtime execution semantics changed; pipeline execution remains **Payload -> Payload**.

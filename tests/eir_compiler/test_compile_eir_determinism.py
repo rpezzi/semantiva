@@ -19,4 +19,6 @@ def test_compile_eir_v1_is_deterministic_and_matches_pipeline_id() -> None:
 
     # eir_id must be stable across compiles (created_at changes must not matter)
     assert e1["identity"]["eir_id"] == e2["identity"]["eir_id"]
-    assert e1["identity"]["pipeline_variant_id"] == e2["identity"]["pipeline_variant_id"]
+    assert (
+        e1["identity"]["pipeline_variant_id"] == e2["identity"]["pipeline_variant_id"]
+    )

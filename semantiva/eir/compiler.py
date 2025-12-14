@@ -10,6 +10,11 @@ from typing import Any, Dict, Tuple
 from semantiva.pipeline.graph_builder import build_canonical_spec, compute_pipeline_id
 from semantiva.registry.descriptors import descriptor_to_json
 
+try:
+    from importlib.metadata import version as _pkg_version  # py3.10+
+except Exception:  # pragma: no cover
+    _pkg_version = None  # type: ignore[assignment]
+
 
 def _stable_dumps(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
@@ -38,6 +43,46 @@ def _fingerprint_source(pipeline_or_spec: Any) -> Tuple[str, str]:
     return ("unknown", "unknown")
 
 
+def _canonicalize_for_eir_id(eir_doc: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Canonical subset used for deterministic identity.
+
+    MUST include structural meaning (graph/parameters/plan/semantics/lineage).
+    MUST exclude ephemeral build/source metadata.
+    MUST exclude identity.eir_id itself.
+    """
+
+    ident = eir_doc.get("identity", {}) or {}
+    return {
+        "eir_version": eir_doc.get("eir_version", 1),
+        "identity": {
+            "pipeline_id": ident.get("pipeline_id", ""),
+            "pipeline_variant_id": ident.get("pipeline_variant_id", ""),
+        },
+        "graph": eir_doc.get("graph", {}),
+        "parameters": eir_doc.get("parameters", {}),
+        "plan": eir_doc.get("plan", {}),
+        "semantics": eir_doc.get("semantics", {}),
+        "lineage": eir_doc.get("lineage", {}),
+    }
+
+
+def compute_eir_id(eir_doc: Dict[str, Any]) -> str:
+    """Compute deterministic eir_id from the canonical subset (see _canonicalize_for_eir_id)."""
+
+    canonical = _canonicalize_for_eir_id(eir_doc)
+    return "eirid-" + _sha256_text(_stable_dumps(canonical))
+
+
+def _semantiva_version_string() -> str:
+    if _pkg_version is None:
+        return "0.x"
+    try:
+        return _pkg_version("semantiva")
+    except Exception:
+        return "0.x"
+
+
 @dataclass(frozen=True)
 class CompileResult:
     eir: Dict[str, Any]
@@ -49,13 +94,18 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
 
     - Classic scalar pipelines only (GraphV1).
     - Deterministic `pipeline_id` (delegates to GraphV1).
-    - Deterministic `eir_id` that EXCLUDES ephemeral build/source metadata.
+    - Deterministic `eir_id` that EXCLUDES ephemeral build/source metadata but
+      INCLUDES structural semantics (semantics/lineage/plan/graph/parameters).
     """
     canonical_graph, resolved_nodes = build_canonical_spec(pipeline_or_spec)
     pipeline_id = compute_pipeline_id(canonical_graph)
 
     # Classic-only variant id (captures enabled semantics modules without runtime values)
-    variant_payload = {"eir_version": 1, "pipeline_id": pipeline_id, "modules": ["classic_scalar"]}
+    variant_payload = {
+        "eir_version": 1,
+        "pipeline_id": pipeline_id,
+        "modules": ["classic_scalar"],
+    }
     pipeline_variant_id = "pvid-" + _sha256_text(_stable_dumps(variant_payload))
 
     # Parameters: store as separate objects keyed by node_uuid
@@ -68,7 +118,10 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
         param_objects[f"params:{node_uuid}"] = descriptor_to_json(params)
 
     # Minimal plan: single classic linear segment with deterministic node order
-    plan = {"plan_version": 1, "segments": [{"kind": "classic_linear", "node_order": node_order}]}
+    plan = {
+        "plan_version": 1,
+        "segments": [{"kind": "classic_linear", "node_order": node_order}],
+    }
 
     # Graph section: embed GraphV1 canonical form under a stable envelope
     graph = {
@@ -77,32 +130,28 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
         "edges": canonical_graph.get("edges", []),
     }
 
-    # Compute eir_id from canonical subset (exclude build/source and identity.eir_id itself)
-    canonical_for_hash = {
-        "eir_version": 1,
-        "identity": {"pipeline_id": pipeline_id, "pipeline_variant_id": pipeline_variant_id},
-        "graph": graph,
-        "parameters": {"objects": param_objects},
-        "plan": plan,
-    }
-    eir_id = "eirid-" + _sha256_text(_stable_dumps(canonical_for_hash))
-
     source_kind, source_fp = _fingerprint_source(pipeline_or_spec)
 
     # Full EIR doc includes build/source but eir_id ignores them (by design)
-    eir = {
+    eir: Dict[str, Any] = {
         "eir_version": 1,
         "build": {
-            "semantiva_version": "0.x",  # factual placeholder; runtime may overwrite later if desired
+            "semantiva_version": _semantiva_version_string(),
             "compiler_version": "eir-compiler-1",
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
         "source": {"kind": source_kind, "pipeline_spec_fingerprint": source_fp},
-        "identity": {"pipeline_id": pipeline_id, "pipeline_variant_id": pipeline_variant_id, "eir_id": eir_id},
+        "identity": {
+            "pipeline_id": pipeline_id,
+            "pipeline_variant_id": pipeline_variant_id,
+            "eir_id": "",
+        },
         "graph": graph,
         "parameters": {"objects": param_objects},
         "plan": plan,
         "semantics": {},  # reserved for C1+
-        "lineage": {},    # reserved for R1+
+        "lineage": {},  # reserved for R1+
     }
+
+    eir["identity"]["eir_id"] = compute_eir_id(eir)
     return eir

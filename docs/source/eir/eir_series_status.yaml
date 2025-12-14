@@ -30,9 +30,18 @@ eir_series:
         - docs/source/eir/eir_schema_v1.rst
         - tests/eir_compiler/test_compile_eir_determinism.py
         - tests/eir_compiler/test_compile_eir_schema_validation.py
+        - tests/eir_compiler/test_compile_eir_ledger_golden_identities.py
+        - tests/eir_compiler/test_eir_id_includes_semantics.py
       notes:
         - "compile_eir_v1 produces classic scalar EIR only"
         - "eir_id excludes build/source metadata (created_at etc.)"
+        - "eir_id includes semantics+lineage in canonical hash input (empty in C0; populated in C1+)"
+      checksums:
+        eir_schema_v1_sha256: "26466736018b6845f948e8158c389d380cc81ab2d613f741030b624b9619dbf9"
+        float_ref_01_compiled_identity:
+          pipeline_id: "plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3"
+          pipeline_variant_id: "pvid-736e0a598fa3b86f672a8a8b8a5f4ac5414692764743f4894d8efe74a68793d5"
+          eir_id: "eirid-00f4fa3365479b02935861c1b3e488bfdd411b7ecad5eac5dffab2e63534cfee"
   reference_suite:
     float:
     - id: float_ref_01
@@ -95,5 +104,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: C0
+    epic: C0-patch
     date: '2025-12-14'
