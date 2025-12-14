@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1 P1: added MultiChannelDataType and a scalar→channel→scalar float reference pipeline (float_ref_channel_01) with SSOT ledger + regression coverage.
 - EIRv1 P2: added metadata-only slot inference from `_process_logic` annotations and a new stable float reference pipeline (float_ref_slots_01) with ledger drift checks.
 - EIRv1 P3: added LaneBundleDataType (data-model PoC) plus lane_map + merge float processors and a new stable float reference pipeline (float_ref_lane_01) with SSOT ledger + regression coverage.
+- EIRv1 C0: added EIRv1 schema skeleton and classic pipeline compiler (`compile_eir_v1`) with determinism + schema-validation tests (no runtime execution changes).
 
 
 ## [v0.5.1] - Unreleased

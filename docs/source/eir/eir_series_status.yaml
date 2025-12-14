@@ -20,6 +20,19 @@ eir_series:
       - docs/source/contracts.rst
       - docs/source/contracts_catalog.md
       - tests/contracts_sva/test_sva220_io_inference.py
+  phase_2:
+    eir_scaffold_and_classic_compiler:
+      epic: C0
+      status: present
+      artifacts:
+        - semantiva/eir/compiler.py
+        - semantiva/eir/schema/eir_v1.schema.json
+        - docs/source/eir/eir_schema_v1.rst
+        - tests/eir_compiler/test_compile_eir_determinism.py
+        - tests/eir_compiler/test_compile_eir_schema_validation.py
+      notes:
+        - "compile_eir_v1 produces classic scalar EIR only"
+        - "eir_id excludes build/source metadata (created_at etc.)"
   reference_suite:
     float:
     - id: float_ref_01
@@ -82,5 +95,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: P3
+    epic: C0
     date: '2025-12-14'

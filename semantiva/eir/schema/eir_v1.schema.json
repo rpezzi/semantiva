@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://semantiva.org/schema/eir_v1.schema.json",
+  "title": "Semantiva EIR v1 (Execution Intermediate Representation)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eir_version", "identity", "graph", "plan"],
+  "properties": {
+    "eir_version": { "const": 1 },
+
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantiva_version", "compiler_version", "created_at"],
+      "properties": {
+        "semantiva_version": { "type": "string", "minLength": 1 },
+        "compiler_version": { "type": "string", "minLength": 1 },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "pipeline_spec_fingerprint": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pipeline_id", "pipeline_variant_id", "eir_id"],
+      "properties": {
+        "pipeline_id": { "type": "string", "minLength": 1 },
+        "pipeline_variant_id": { "type": "string", "minLength": 1 },
+        "eir_id": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_version", "nodes", "edges"],
+      "properties": {
+        "graph_version": { "type": "integer" },
+        "nodes": { "type": "array", "items": { "type": "object" } },
+        "edges": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objects"],
+      "properties": {
+        "objects": { "type": "object", "additionalProperties": true }
+      }
+    },
+
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_version", "segments"],
+      "properties": {
+        "plan_version": { "type": "integer", "const": 1 },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "node_order"],
+            "properties": {
+              "kind": { "type": "string", "const": "classic_linear" },
+              "node_order": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "semantics": { "type": "object", "additionalProperties": true },
+    "lineage": { "type": "object", "additionalProperties": true }
+  }
+}

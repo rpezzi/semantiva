@@ -8,6 +8,7 @@ it is deliberately factual and drift-resistant.
    :maxdepth: 2
 
    eir_program_charter
+   eir_schema_v1
 
 Series status ledger (SSOT)
 ---------------------------

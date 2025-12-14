@@ -23,6 +23,7 @@ includes = [
     "semantiva",
     "semantiva/py.typed",
     "semantiva/trace/schema/*.json",
+    "semantiva/eir/schema/*.json",
 ]
 
 # Exclude noisy or dev-only files from the wheel so the distribution stays small
@@ -94,6 +95,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "semantiva.trace.schema" = ["*.json"]
+"semantiva.eir.schema" = ["*.json"]
 
 [project.entry-points."semantiva.extensions"]
 semantiva-examples = "semantiva.examples.extension:SemantivaExamplesExtension"
