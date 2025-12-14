@@ -1,3 +1,11 @@
+"""Demo 2: composing two channel payloads with a deterministic merge.
+
+This example constructs two independent multi-channel payloads, merges them via
+namespacing to avoid collisions, and then projects to an explicit channel set.
+
+It demonstrates a simple, deterministic policy for combining channel payloads.
+"""
+
 from __future__ import annotations
 
 from typing import cast
@@ -11,6 +19,7 @@ from examples.eir_algebra_demos.algebra_demos import merge, select
 
 
 def run() -> dict:
+    """Run the demo and return a small JSON-serializable summary."""
     A = Payload(
         MultiChannelDataType({"ref": FloatDataType(1.0), "feat_a": FloatDataType(2.0)}),
         ContextType({"source": "A"}),

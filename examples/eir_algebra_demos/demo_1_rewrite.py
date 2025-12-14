@@ -1,3 +1,12 @@
+"""Demo 1: a small rewrite using channel-algebra helpers.
+
+Demonstrates:
+
+* selecting a subset of channels,
+* applying a transform to one channel,
+* renaming a channel to a stable reference name.
+"""
+
 from __future__ import annotations
 
 from typing import cast
@@ -17,6 +26,7 @@ from examples.eir_algebra_demos.algebra_demos import (
 
 
 def run() -> dict:
+    """Run the demo and return a small JSON-serializable summary."""
     # 1) Start P with {img, mask, float_ref_channel_01} (float-only stand-ins)
     P = Payload(
         MultiChannelDataType(

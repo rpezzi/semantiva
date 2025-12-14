@@ -1,3 +1,13 @@
+"""Demo 3: reference-anchored feature derivation in channel form.
+
+This example treats one channel as a stable reference, uses it to compute an
+"aligned" signal from another channel, derives a feature, and then rewrites the
+payload so the reference channel is explicitly named ``ref``.
+
+All values are float-only stand-ins; the goal is to demonstrate the data-flow
+shape, not a domain-specific algorithm.
+"""
+
 from __future__ import annotations
 
 from typing import cast
@@ -16,6 +26,7 @@ from examples.eir_algebra_demos.algebra_demos import (
 
 
 def run() -> dict:
+    """Run the demo and return a small JSON-serializable summary."""
     P = Payload(
         MultiChannelDataType(
             {

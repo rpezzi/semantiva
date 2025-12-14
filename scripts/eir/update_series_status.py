@@ -50,10 +50,22 @@ from semantiva.pipeline.graph_builder import (
 
 
 def sha256_file(path: Path) -> str:
+    """Compute the hex sha256 digest for a file."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def load_ledger(path: Path) -> Dict[str, Any]:
+    """Load and minimally validate the series ledger YAML.
+
+    Args:
+        path: Path to ``eir_series_status.yaml``.
+
+    Returns:
+        Parsed YAML as a dictionary.
+
+    Raises:
+        ValueError: If the YAML does not include the expected ``eir_series`` key.
+    """
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or "eir_series" not in data:
         raise ValueError(f"Invalid ledger format: missing 'eir_series' at {path}")
@@ -61,6 +73,24 @@ def load_ledger(path: Path) -> Dict[str, Any]:
 
 
 def update_float_suite(data: Dict[str, Any]) -> List[str]:
+    """Update float reference-suite entries with newly computed hashes and IDs.
+
+    Mutates the provided ledger mapping in-place.
+
+    For each entry under ``eir_series.reference_suite.float``:
+    * computes the sha256 of the referenced YAML file,
+    * computes the canonical spec and pipeline id via GraphV1.
+
+    Args:
+        data: Parsed ledger mapping (as returned by :func:`load_ledger`).
+
+    Returns:
+        A list of updated reference entry IDs (as strings).
+
+    Raises:
+        ValueError: If the ledger structure is not as expected.
+        FileNotFoundError: If a referenced YAML path does not exist.
+    """
     updated: List[str] = []
     suite = data["eir_series"]["reference_suite"]["float"]
     if not isinstance(suite, list):
@@ -84,6 +114,7 @@ def update_float_suite(data: Dict[str, Any]) -> List[str]:
 
 
 def main() -> int:
+    """CLI entrypoint for updating or checking the series ledger."""
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "--check",
