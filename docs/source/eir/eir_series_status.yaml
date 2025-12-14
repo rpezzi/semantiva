@@ -109,6 +109,17 @@ eir_series:
       notes:
         - "Developer-facing, in-process example for executing float_ref_01 via EIR scalar harness."
         - "Regression test ensures demo remains runnable and stable across refactoring."
+    r0b_eir_scalar_parity_validation:
+      epic: R0b
+      status: complete
+      date: "2025-12-14"
+      artifacts:
+        - tests/eir_runtime/test_eir_scalar_parity_reference_suite.py
+        - tests/eir_reference_suite/float_ref_01.yaml
+        - tests/eir_reference_suite/float_ref_02.yaml
+      notes:
+        - "Parity validation: legacy classic scalar execution vs EIR scalar execution (float_ref_01, float_ref_02)."
+        - "Parity defined as data equality + context equality, no runtime switch."
   reference_suite:
     float:
     - id: float_ref_01
@@ -171,5 +182,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: R0a-demo
+    epic: R0b
     date: '2025-12-14'
