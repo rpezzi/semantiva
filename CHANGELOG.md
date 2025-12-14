@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1 Phase 3 R0a-demo: added in-process developer demo for executing `float_ref_01` via the EIR scalar execution harness, with a regression test to ensure stability.
 - EIRv1 Phase 3 (R0b): add scalar parity regression tests comparing legacy classic execution vs EIR scalar execution for reference pipelines.
 - EIRv1 Phase 3 (R0c): added opt-in `execution_backend` selector for orchestrator execution, routing classic scalar pipelines through the EIR scalar path while keeping legacy as default; includes trace equivalence regression coverage.
+- EIRv1: add Python peer reference suite specs for scalar pipelines (FP0a) and smoke coverage for legacy + EIR-scalar execution.
 
 
 ## [v0.5.1] - Unreleased

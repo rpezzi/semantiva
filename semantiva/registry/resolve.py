@@ -66,4 +66,17 @@ def resolve_symbol(name_or_type: Union[str, Type]) -> Type:
                 ProcessorRegistry.register_processor(class_name, candidate)
                 return candidate
 
+    # Safety net: try dotted format (module.Class) as well
+    if "." in symbol and ":" not in symbol:
+        mod_name, _, cls_name = symbol.rpartition(".")
+        if mod_name and cls_name:
+            try:
+                module = importlib.import_module(mod_name)
+                candidate = getattr(module, cls_name, None)
+                if isinstance(candidate, type):
+                    ProcessorRegistry.register_processor(cls_name, candidate)
+                    return candidate
+            except Exception:
+                pass
+
     raise UnknownProcessorError(f"Cannot resolve processor symbol: {symbol!r}")

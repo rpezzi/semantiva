@@ -35,6 +35,36 @@ def _stable_dumps(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
+def _lossy_jsonable(obj: object) -> object:
+    """Return a deterministic, JSON-friendly representation without mem-ids."""
+
+    if obj is None or isinstance(obj, (bool, int, float, str)):
+        return obj
+    if isinstance(obj, (list, tuple)):
+        return [_lossy_jsonable(item) for item in obj]
+    if isinstance(obj, dict):
+        items: list[tuple[str, object]] = []
+        for key, value in obj.items():
+            ks = key if isinstance(key, str) else f"key:{type(key).__name__}"
+            items.append((ks, _lossy_jsonable(value)))
+        return {k: v for k, v in sorted(items, key=lambda pair: pair[0])}
+
+    if isinstance(obj, type):
+        return f"pyclass:{obj.__module__}.{obj.__qualname__}"
+
+    qualname = getattr(obj, "__qualname__", None)
+    modname = getattr(obj, "__module__", None)
+    if callable(obj) and isinstance(qualname, str) and isinstance(modname, str):
+        return f"callable:{modname}.{qualname}"
+
+    cls = getattr(obj, "__class__", None)
+    if isinstance(cls, type):
+        return f"object:{cls.__module__}.{cls.__qualname__}"
+
+    type_name = getattr(type(obj), "__name__", None) or "unknown"
+    return f"unserializable:{type_name}"
+
+
 def _sha256_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -53,7 +83,26 @@ def _fingerprint_source(pipeline_or_spec: Any) -> Tuple[str, str]:
     if hasattr(pipeline_or_spec, "pipeline_configuration"):
         return ("pipeline_object", "pipeline_object")
     if isinstance(pipeline_or_spec, (list, tuple)):
-        return ("node_list", _sha256_text(_stable_dumps(list(pipeline_or_spec))))
+        # Best-effort fingerprint for node lists: convert class refs to strings
+        try:
+            normalized = []
+            for item in pipeline_or_spec:
+                if isinstance(item, dict):
+                    normalized_item = dict(item)
+                    proc = normalized_item.get("processor")
+                    if isinstance(proc, type):
+                        normalized_item["processor"] = (
+                            f"{proc.__module__}.{proc.__qualname__}"
+                        )
+                    normalized.append(normalized_item)
+                else:
+                    normalized.append(item)
+            payload = _stable_dumps(normalized)
+            return ("node_list", _sha256_text(payload))
+        except Exception:
+            lossy = _lossy_jsonable(normalized)
+            payload = _stable_dumps(lossy)
+            return ("node_list_lossy", _sha256_text(payload))
     return ("unknown", "unknown")
 
 

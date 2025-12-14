@@ -132,6 +132,19 @@ eir_series:
       notes:
         - "Adds opt-in execution_backend selector; default remains legacy."
         - "EIR path is scalar-only classic_linear via R0a harness; parity proven in R0b."
+  phase_fp:
+    fp0a_python_reference_suite_scalar:
+      epic: FP0a
+      status: present
+      date: "2025-12-14"
+      artifacts:
+        - tests/eir_reference_suite_python/float_ref_01.py
+        - tests/eir_reference_suite_python/float_ref_02.py
+        - tests/eir_runtime/test_python_reference_suite_smoke.py
+      notes:
+        - "Adds Python peer frontend inputs for scalar reference suite."
+        - "Smoke coverage: legacy execution and EIR scalar harness both run from Python specs."
+        - "No canonical-spec parity claims yet (FP0b/FP0c)."
   reference_suite:
     float:
     - id: float_ref_01
