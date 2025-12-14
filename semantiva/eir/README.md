@@ -9,6 +9,8 @@ Canonical namespace for the **EIRv1** implementation series.
 - C1 compiler emits deterministic compiled facts under `semantics`:
   - `semantics.payload_forms` (scalar/channel/lane_bundle per node)
   - `semantics.slots` (metadata-only slot candidates from `_process_logic` annotations)
+- Runtime preflight helper: `semantiva.eir.validate_eir_v1(eir)` validates an EIR document
+  against the packaged `eir_v1.schema.json` (useful for Phase 3 runtime epics).
 
 ## Not implemented yet
 
@@ -20,3 +22,6 @@ See:
 - `docs/source/eir/eir_program_charter.rst`
 - `docs/source/eir/eir_series_status.yaml`
 - `TDR_EIRv1.md` (project artifact)
+
+Note: `docs/source/eir/eir_series_status.yaml` is a historical per-epic snapshot ledger.
+Do not interpret earlier epic checksums as "latest state" for the current branch.

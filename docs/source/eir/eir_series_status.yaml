@@ -1,6 +1,15 @@
 eir_series:
   name: EIRv1
   series_version: 1
+  ledger_policy:
+    kind: "historical_snapshots"
+    meaning:
+      - "This file is a historical ledger of per-epic snapshots (checksums + compiled identities)."
+      - "Values under phase_*.*.checksums are authoritative ONLY for that epic snapshot."
+      - "Checksums MAY differ across epics (e.g., schema SHA when the schema evolved during the series)."
+    automation_guidance:
+      - "Do not treat phase_*.*.checksums as a 'latest state' across the repo."
+      - "If an automation needs a 'current' checksum, it must select a specific epic snapshot (typically the latest landed epic for that phase) and compare only against that snapshot."
   phase_0:
     scaffold:
       epic: P0a

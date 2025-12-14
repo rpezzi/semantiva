@@ -136,14 +136,22 @@ def _declared_io_types(processor_cls: type) -> Tuple[Optional[type], Optional[ty
     out_t: Optional[type] = None
 
     try:
-        cand = processor_cls.input_data_type() if hasattr(processor_cls, "input_data_type") else None
+        cand = (
+            processor_cls.input_data_type()
+            if hasattr(processor_cls, "input_data_type")
+            else None
+        )
         if isinstance(cand, type) and issubclass(cand, BaseDataType):
             in_t = cand
     except Exception:
         in_t = None
 
     try:
-        cand = processor_cls.output_data_type() if hasattr(processor_cls, "output_data_type") else None
+        cand = (
+            processor_cls.output_data_type()
+            if hasattr(processor_cls, "output_data_type")
+            else None
+        )
         if isinstance(cand, type) and issubclass(cand, BaseDataType):
             out_t = cand
     except Exception:
@@ -229,7 +237,9 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
 
     for node_canon, node_resolved in zip(canonical_graph["nodes"], resolved_nodes):
         node_uuid = str(node_canon["node_uuid"])
-        proc_spec = node_resolved.get("processor") or node_canon.get("processor_ref") or ""
+        proc_spec = (
+            node_resolved.get("processor") or node_canon.get("processor_ref") or ""
+        )
         proc_cls, proc_ref = _resolve_processor(proc_spec)
 
         in_t: Optional[type] = None
@@ -261,8 +271,14 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
             "output_form": output_form,
         }
         node_slots[node_uuid] = {
-            "declared_io": {"input_type": _type_name(in_t), "output_type": _type_name(out_t)},
-            "inferred_slots": {"inputs": list(inferred_slots.get("inputs", [])), "output": inferred_slots.get("output")},
+            "declared_io": {
+                "input_type": _type_name(in_t),
+                "output_type": _type_name(out_t),
+            },
+            "inferred_slots": {
+                "inputs": list(inferred_slots.get("inputs", [])),
+                "output": inferred_slots.get("output"),
+            },
         }
 
     param_objects: Dict[str, Any] = {}
@@ -273,7 +289,10 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
         params = node_resolved.get("parameters", {}) or {}
         param_objects[f"params:{node_uuid}"] = descriptor_to_json(params)
 
-    plan = {"plan_version": 1, "segments": [{"kind": "classic_linear", "node_order": node_order}]}
+    plan = {
+        "plan_version": 1,
+        "segments": [{"kind": "classic_linear", "node_order": node_order}],
+    }
     graph = {
         "graph_version": int(canonical_graph.get("version", 1)),
         "nodes": canonical_graph.get("nodes", []),
@@ -289,7 +308,11 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
     if node_order:
         first = node_io[node_order[0]]
         last = node_io[node_order[-1]]
-        root_form = first["input_form"] if first.get("input_type") is not None else first["output_form"]
+        root_form = (
+            first["input_form"]
+            if first.get("input_type") is not None
+            else first["output_form"]
+        )
         terminal_form = last["output_form"]
 
     semantics: Dict[str, Any] = {
@@ -312,7 +335,11 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
         "source": {"kind": source_kind, "pipeline_spec_fingerprint": source_fp},
-        "identity": {"pipeline_id": pipeline_id, "pipeline_variant_id": pipeline_variant_id, "eir_id": ""},
+        "identity": {
+            "pipeline_id": pipeline_id,
+            "pipeline_variant_id": pipeline_variant_id,
+            "eir_id": "",
+        },
         "graph": graph,
         "parameters": {"objects": param_objects},
         "plan": plan,

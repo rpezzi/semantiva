@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1 P3: added LaneBundleDataType (data-model PoC) plus lane_map + merge float processors and a new stable float reference pipeline (float_ref_lane_01) with SSOT ledger + regression coverage.
 - EIRv1 C0: added EIRv1 schema skeleton and classic pipeline compiler (`compile_eir_v1`) with determinism + schema-validation tests (no runtime execution changes).
 - EIRv1 C1: compiler emits schema-valid deterministic semantics (payload forms + slot candidates) for Phase-1 PoC pipelines; no runtime execution changes.
+- EIRv1 C1a: added `semantiva.eir.validate_eir_v1` helper for packaged-schema validation, and documented ledger historical snapshot semantics + `classic_linear` runtime mapping guidance for Phase 3.
 
 
 ## [v0.5.1] - Unreleased

@@ -14,6 +14,13 @@ def test_eir_id_changes_when_semantics_changes() -> None:
     base = eir["identity"]["eir_id"]
 
     mutated = dict(eir)
-    mutated["semantics"] = {"payload_forms": {"version": 1, "root_form": "scalar", "terminal_form": "scalar", "node_io": {}}}
+    mutated["semantics"] = {
+        "payload_forms": {
+            "version": 1,
+            "root_form": "scalar",
+            "terminal_form": "scalar",
+            "node_io": {},
+        }
+    }
 
     assert compute_eir_id(mutated) != base

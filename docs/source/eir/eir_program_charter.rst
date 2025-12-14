@@ -103,3 +103,36 @@ Phase 2 facts (as landed)
   - metadata-only inferred slot candidates per node from ``_process_logic`` annotations
 - ``eir_id`` is computed from a canonical subset that includes ``graph``, ``parameters``, ``plan``, ``semantics``, and ``lineage``,
   while excluding ephemeral ``build``/``source`` metadata (timestamps, environment drift).
+
+Ledger semantics (historical snapshots)
+---------------------------------------
+
+``docs/source/eir/eir_series_status.yaml`` is a **historical ledger**.
+
+- Each epic entry records the state *as landed for that epic* (checksums, compiled identities).
+- These values are **not** a “latest state” assertion for the current branch across all time.
+- Automated checks MUST select a specific epic snapshot when comparing checksums.
+  For example, Phase 2 schema checksum comparisons should target the latest Phase 2 epic
+  snapshot (currently C1), and MUST NOT assume older snapshot checksums match the current schema.
+
+
+Phase 3 runtime mapping note: ``classic_linear``
+------------------------------------------------
+
+EIRv1 Phase 2 compilation emits a plan segment of kind ``classic_linear``:
+
+- ``plan.segments[].kind == "classic_linear"``
+- ``plan.segments[].node_order`` lists node ids in execution order.
+
+**Mapping guidance for Phase 3 runtime epics (courtesy, not yet implemented):**
+
+A Phase 3 execution-from-EIR runner may treat ``classic_linear`` as the
+direct analogue of Semantiva's current classic pipeline execution:
+
+1) Resolve each ``node_id`` in ``node_order`` to the corresponding entry in ``graph.nodes``.
+2) Construct an equivalent classic runtime pipeline in that order (processor refs + parameters).
+3) Execute sequentially under existing classic runtime semantics (**Payload -> Payload**),
+   producing the same payload outputs as the corresponding YAML pipeline would.
+
+This mapping provides a stable baseline for the first execution-from-EIR milestone while
+preserving Phase 2's constraint: **no runtime behavior changes**.
