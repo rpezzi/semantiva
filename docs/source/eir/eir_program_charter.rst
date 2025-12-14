@@ -98,3 +98,8 @@ Phase 2 facts (as landed)
   - includes: ``graph``, ``parameters``, ``plan``, ``semantics``, ``lineage``
   - excludes: ephemeral ``build``/``source`` metadata (timestamps, environment drift)
 - No runtime execution semantics changed; pipeline execution remains **Payload -> Payload**.
+- Phase 2 C1 extends compilation to emit deterministic compiled facts in ``semantics``:
+  - payload form propagation per node (scalar/channel/lane_bundle)
+  - metadata-only inferred slot candidates per node from ``_process_logic`` annotations
+- ``eir_id`` is computed from a canonical subset that includes ``graph``, ``parameters``, ``plan``, ``semantics``, and ``lineage``,
+  while excluding ephemeral ``build``/``source`` metadata (timestamps, environment drift).

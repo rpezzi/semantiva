@@ -42,6 +42,43 @@ eir_series:
           pipeline_id: "plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3"
           pipeline_variant_id: "pvid-736e0a598fa3b86f672a8a8b8a5f4ac5414692764743f4894d8efe74a68793d5"
           eir_id: "eirid-00f4fa3365479b02935861c1b3e488bfdd411b7ecad5eac5dffab2e63534cfee"
+    eir_compiler_poc_forms_and_slots:
+      epic: C1
+      status: present
+      artifacts:
+        - semantiva/eir/compiler.py
+        - semantiva/eir/schema/eir_v1.schema.json
+        - tests/eir_compiler/test_compile_eir_reference_suite_schema_validation.py
+        - tests/eir_compiler/test_compile_eir_reference_suite_semantics.py
+        - tests/eir_compiler/test_compile_eir_ledger_golden_identities.py
+        - tests/eir_compiler/test_eir_id_includes_semantics.py
+      notes:
+        - "compile_eir_v1 loads YAML extensions (best-effort) to resolve processor symbols"
+        - "compile_eir_v1 emits semantics.payload_forms + semantics.slots deterministically"
+        - "eir_id hashes graph/parameters/plan/semantics/lineage and excludes build/source"
+      checksums:
+        eir_schema_v1_sha256: "3184521ddba89a4eaefbee345017969179c3452d2e386f05bc95871e9222b69b"
+        compiled_identities:
+          float_ref_01:
+            pipeline_id: "plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3"
+            pipeline_variant_id: "pvid-10450164ecd56153085f6c777a3369f2fd135c03a87de70630b368300d7ccd72"
+            eir_id: "eirid-f8c2d78be711f2f055a5a251fb3c654241812a60ea9ced94796351701fc7c561"
+          float_ref_02:
+            pipeline_id: "plid-dbf8fa82954040c7262e23f3722707f9e7213ae9bf1ceba047198065fc29620e"
+            pipeline_variant_id: "pvid-bd539ba2035d3e772492d6735e71835a4b786ac626d468d31a5e09d5a3cf2a82"
+            eir_id: "eirid-16621530a1c55d6fbd09192c10cb24c700e3fd57b0ad36939eeeb04235bca0fe"
+          float_ref_channel_01:
+            pipeline_id: "plid-cc1fa01b97231217e0a2ad472d95be1789864c3a11a1c6fee3999909a0ba629a"
+            pipeline_variant_id: "pvid-b71795f71e248ae479d3dcdc0f5b65f30d74d0afe32c7637a5663f5ae368b30e"
+            eir_id: "eirid-5a2543a942ec3860ec69ed2b67688d3c7c0535f8d941fdf481515632404025ad"
+          float_ref_slots_01:
+            pipeline_id: "plid-cc88682c597f0eebe6c34653b114665645b331218bf343171955908be6f3b79c"
+            pipeline_variant_id: "pvid-0cf88a9c26ceeefb909ca8744ca7b784899ff197314697e45c42cb154dae4ed3"
+            eir_id: "eirid-4e5c99f228bd28ea1a9111ca925898bd8cbfc48adbaa6c21a407e0863aa7e9f5"
+          float_ref_lane_01:
+            pipeline_id: "plid-5e25e7a153ea053946caf69160744c53649be5836c437789ff5f7d912e646cbc"
+            pipeline_variant_id: "pvid-c923fbf9200928a5953c1aaf6b16cbe8877c196d25042c1fd2d653bd4c84fbc5"
+            eir_id: "eirid-e181e9b096e58e9466378ea08e34b5cf2569d97e1e964458a800427e817faa9c"
   reference_suite:
     float:
     - id: float_ref_01
@@ -104,5 +141,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: C0-patch
+    epic: C1
     date: '2025-12-14'

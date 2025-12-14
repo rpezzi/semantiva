@@ -86,14 +86,9 @@
               {
                 "type": "object",
                 "additionalProperties": true,
-                "required": ["kind", "node_order"],
+                "required": ["kind"],
                 "properties": {
-                  "kind": { "type": "string", "minLength": 1 },
-                  "node_order": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": { "type": "string", "minLength": 1 }
-                  }
+                  "kind": { "type": "string", "minLength": 1 }
                 }
               }
             ]
@@ -102,7 +97,84 @@
       }
     },
 
-    "semantics": { "type": "object", "additionalProperties": true },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "payload_forms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "root_form", "terminal_form", "node_io"],
+          "properties": {
+            "version": { "type": "integer", "const": 1 },
+            "root_form": { "type": "string", "enum": ["scalar", "channel", "lane_bundle"] },
+            "terminal_form": { "type": "string", "enum": ["scalar", "channel", "lane_bundle"] },
+            "node_io": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["processor_ref", "input_type", "output_type", "input_form", "output_form"],
+                "properties": {
+                  "processor_ref": { "type": "string" },
+                  "input_type": { "type": ["string", "null"] },
+                  "output_type": { "type": ["string", "null"] },
+                  "input_form": { "type": "string", "enum": ["scalar", "channel", "lane_bundle"] },
+                  "output_form": { "type": "string", "enum": ["scalar", "channel", "lane_bundle"] }
+                }
+              }
+            }
+          }
+        },
+        "slots": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "node_slots"],
+          "properties": {
+            "version": { "type": "integer", "const": 1 },
+            "node_slots": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["declared_io", "inferred_slots"],
+                "properties": {
+                  "declared_io": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["input_type", "output_type"],
+                    "properties": {
+                      "input_type": { "type": ["string", "null"] },
+                      "output_type": { "type": ["string", "null"] }
+                    }
+                  },
+                  "inferred_slots": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["inputs", "output"],
+                    "properties": {
+                      "inputs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["name", "type"],
+                          "properties": {
+                            "name": { "type": "string", "minLength": 1 },
+                            "type": { "type": "string", "minLength": 1 }
+                          }
+                        }
+                      },
+                      "output": { "type": ["string", "null"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "lineage": { "type": "object", "additionalProperties": true }
   }
 }
