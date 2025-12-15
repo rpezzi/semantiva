@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1 (FP0c): add compiled EIR semantic parity tests ensuring YAML and Python frontends yield identical EIRv1 meaning for scalar reference pipelines, modulo provenance/build metadata.
 - EIRv1 (FP0d): CanonicalSpec identity migrated to FQCN-only processor_ref (<module>.<qualname>) with mutual exclusion between processor and processor_ref; pipeline/node IDs change once for affected reference-suite pipelines.
 - EIRv1 (FP1a): enforce “no bypass” CanonicalSpec convergence for YAML+Python compilation via frontend parity tests (no runtime behavior change).
+- EIRv1 (FP1b): add CanonicalPipelineSpecV1 pre-flight validation with stable, frontend-tagged diagnostics + scalar validation parity tests (no runtime behavior change).
 
 
 ## [v0.5.1] - Unreleased
