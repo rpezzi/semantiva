@@ -35,6 +35,18 @@ def normalize_canonical_spec(canon: dict[str, Any]) -> dict[str, Any]:
     return _strip_provenance(copied)
 
 
+def normalize_eir_doc(eir: dict[str, Any]) -> dict[str, Any]:
+    """
+    Normalize EIR documents for semantic parity comparisons.
+
+    FP0c rule:
+      - Exclude frontend/build provenance (eir.source.*, build timestamps/version strings).
+      - Preserve semantic meaning: identity (including eir_id), graph, parameters, plan, semantics, lineage.
+    """
+    copied = json.loads(json.dumps(eir, sort_keys=True))
+    return _strip_provenance(copied)
+
+
 def canonical_bytes(obj: Any) -> bytes:
     return json.dumps(
         obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False

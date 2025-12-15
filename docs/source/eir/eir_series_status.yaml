@@ -209,6 +209,21 @@ eir_series:
         - "ProcessorRegistry mutations do not leak between tests"
         - "compile_eir_v1 emits dotted-FQCN processor_ref for float_ref_01/02"
         - "Ambiguous short-name in EIR compilation errors deterministically"
+    fp0c_compiled_artifact_parity_scalar:
+      epic: FP0c
+      status: present
+      date: "2025-12-15"
+      artifacts:
+        - tests/eir_frontend_parity/_normalize.py
+        - tests/eir_frontend_parity/test_eir_semantics_parity_scalar.py
+      notes:
+        - "Compiled artifact parity gate: YAML vs Python compile to semantically identical EIRv1 for scalar reference pipelines."
+        - "Equality is modulo provenance/build metadata (eir.source.*, build timestamps/tool strings)."
+        - "Determinism check prevents provenance drift from leaking into semantic-bearing sections."
+      gates:
+        - "Normalized EIR bytes parity passes for float_ref_01 and float_ref_02 (YAML vs Python)"
+        - "Schema validation passes for both frontends"
+        - "Repeat-build determinism holds per frontend after normalization"
   reference_suite:
     float:
     - id: float_ref_01
@@ -271,5 +286,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: FP0c0
+    epic: FP0c
     date: "2025-12-15"
