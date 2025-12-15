@@ -71,23 +71,23 @@ eir_series:
           float_ref_01:
             pipeline_id: "plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3"
             pipeline_variant_id: "pvid-10450164ecd56153085f6c777a3369f2fd135c03a87de70630b368300d7ccd72"
-            eir_id: "eirid-f8c2d78be711f2f055a5a251fb3c654241812a60ea9ced94796351701fc7c561"
+            eir_id: "eirid-b74100b54e2713e5781709aca737abc1988f5e6ec680a1d10425cd954a828e6d"
           float_ref_02:
             pipeline_id: "plid-dbf8fa82954040c7262e23f3722707f9e7213ae9bf1ceba047198065fc29620e"
             pipeline_variant_id: "pvid-bd539ba2035d3e772492d6735e71835a4b786ac626d468d31a5e09d5a3cf2a82"
-            eir_id: "eirid-16621530a1c55d6fbd09192c10cb24c700e3fd57b0ad36939eeeb04235bca0fe"
+            eir_id: "eirid-411f409b0f546c5e88dc944a809abc8b2d32d81344d184a85f84404df0039917"
           float_ref_channel_01:
             pipeline_id: "plid-cc1fa01b97231217e0a2ad472d95be1789864c3a11a1c6fee3999909a0ba629a"
             pipeline_variant_id: "pvid-b71795f71e248ae479d3dcdc0f5b65f30d74d0afe32c7637a5663f5ae368b30e"
-            eir_id: "eirid-5a2543a942ec3860ec69ed2b67688d3c7c0535f8d941fdf481515632404025ad"
+            eir_id: "eirid-195922a9db9aa39aef7ce7e92769e0f9dfb43d468ff31304eca9db98defd9420"
           float_ref_slots_01:
             pipeline_id: "plid-cc88682c597f0eebe6c34653b114665645b331218bf343171955908be6f3b79c"
             pipeline_variant_id: "pvid-0cf88a9c26ceeefb909ca8744ca7b784899ff197314697e45c42cb154dae4ed3"
-            eir_id: "eirid-4e5c99f228bd28ea1a9111ca925898bd8cbfc48adbaa6c21a407e0863aa7e9f5"
+            eir_id: "eirid-52fe68d42e14fe38368bbfb8ea671c8fabaf30ba27cfc48b5a56093f4f18e6dc"
           float_ref_lane_01:
             pipeline_id: "plid-5e25e7a153ea053946caf69160744c53649be5836c437789ff5f7d912e646cbc"
             pipeline_variant_id: "pvid-c923fbf9200928a5953c1aaf6b16cbe8877c196d25042c1fd2d653bd4c84fbc5"
-            eir_id: "eirid-e181e9b096e58e9466378ea08e34b5cf2569d97e1e964458a800427e817faa9c"
+            eir_id: "eirid-241a8f2eae8c530e422c4a996fac8e5124937624a39f983102707a498f23a0c1"
   phase_3:
     r0a_eir_scalar_execution_harness:
       epic: R0a
@@ -192,6 +192,23 @@ eir_series:
         - "CanonicalSpec bytes parity passes for float_ref_01 and float_ref_02"
         - "pipeline_id parity passes for float_ref_01 and float_ref_02"
         - "Drift locks: _NODE_NAMESPACE frozen; no extension loading in canonicalization"
+    fp0c0_fp0c_derisk_identity_boundary:
+      epic: FP0c0
+      status: present
+      date: "2025-12-15"
+      artifacts:
+        - semantiva/eir/compiler.py
+        - semantiva/registry/processor_registry.py
+        - tests/eir_frontend_parity/conftest.py
+        - tests/eir_frontend_parity/test_graph_builder_identity_contracts.py
+        - tests/eir_frontend_parity/test_eir_compiler_processor_ref_fqcn_contract.py
+      notes:
+        - "Derisks FP0c by enforcing EIR processor identity as FQCN-only (registry-independent semantics)."
+        - "Adds test isolation for ProcessorRegistry to prevent cross-test drift."
+      gates:
+        - "ProcessorRegistry mutations do not leak between tests"
+        - "compile_eir_v1 emits dotted-FQCN processor_ref for float_ref_01/02"
+        - "Ambiguous short-name in EIR compilation errors deterministically"
   reference_suite:
     float:
     - id: float_ref_01
@@ -254,5 +271,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: FP0b
-    date: "2025-12-14"
+    epic: FP0c0
+    date: "2025-12-15"

@@ -31,6 +31,10 @@ from semantiva.registry import load_extensions, resolve_symbol
 from semantiva.registry.descriptors import descriptor_to_json
 
 
+def _fqcn(proc_cls: type) -> str:
+    return f"{proc_cls.__module__}.{proc_cls.__qualname__}"
+
+
 def _stable_dumps(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
@@ -167,7 +171,7 @@ def _resolve_processor(proc_spec: Any) -> Tuple[Optional[type], str]:
     Never raises.
     """
     if isinstance(proc_spec, type):
-        return proc_spec, f"{proc_spec.__module__}.{proc_spec.__qualname__}"
+        return proc_spec, _fqcn(proc_spec)
     ref = str(proc_spec or "")
     if not ref:
         return None, ""
@@ -179,6 +183,57 @@ def _resolve_processor(proc_spec: Any) -> Tuple[Optional[type], str]:
         if dotted is not None:
             return dotted, ref
         return None, ref
+
+
+def _resolve_processor_for_eir(proc_spec: Any) -> Tuple[type, str]:
+    """Resolve processor specification and return (class, fqcn).
+
+    Unlike `_resolve_processor`, this is strict and intended for EIR emission:
+    EIR must not embed registry-relative identifiers.
+    """
+
+    if isinstance(proc_spec, type):
+        return proc_spec, _fqcn(proc_spec)
+
+    ref = str(proc_spec or "").strip()
+    if not ref:
+        raise ValueError("EIR compilation requires a non-empty processor reference")
+
+    try:
+        proc_cls = resolve_symbol(ref)
+        return proc_cls, _fqcn(proc_cls)
+    except Exception as exc:
+        # Try dotted import as a backward-compat safety net.
+        dotted = _try_import_dotted(ref)
+        if dotted is not None:
+            return dotted, _fqcn(dotted)
+
+        # Make errors deterministic/actionable regardless of resolver exception type.
+        from semantiva.registry.processor_registry import ProcessorRegistry
+
+        cands = ProcessorRegistry.get_candidates(ref)
+        # get_candidates may return 0, 1 or many candidate FQCNs. Only >1
+        # indicates true ambiguity. If exactly one candidate exists but the
+        # resolver still failed, surface a helpful resolution-failed message
+        # (single candidate exists but resolution could not complete). If no
+        # candidates are known, report unknown processor reference.
+        if len(cands) > 1:
+            raise ValueError(
+                "Ambiguous processor reference "
+                f"{ref!r}. Use a dotted fully-qualified class name (FQCN). Candidates: {cands}"
+            ) from exc
+        if len(cands) == 1:
+            cand = list(cands)[0]
+            raise ValueError(
+                "Could not resolve processor reference "
+                f"{ref!r}. A candidate exists ({cand}) but resolution failed; "
+                "ensure extensions are loaded or use the dotted FQCN."
+            ) from exc
+        # No candidates recorded for this short name: unknown symbol.
+        raise ValueError(
+            "Unknown processor reference "
+            f"{ref!r}. Ensure extensions are loaded and/or use a dotted FQCN."
+        ) from exc
 
 
 def _type_name(t: Optional[type]) -> Optional[str]:
@@ -303,7 +358,7 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
         proc_spec = (
             node_resolved.get("processor") or node_canon.get("processor_ref") or ""
         )
-        proc_cls, proc_ref = _resolve_processor(proc_spec)
+        proc_cls, proc_ref = _resolve_processor_for_eir(proc_spec)
 
         in_t: Optional[type] = None
         out_t: Optional[type] = None

@@ -24,7 +24,7 @@ def test_class_processor_canonicalizes_to_short_name_when_unambiguous() -> None:
     assert canon["processor_ref"] == "LocalProc"
 
 
-def test_ambiguous_short_name_falls_back_to_fqcn() -> None:
+def test_ambiguous_short_name_falls_back_to_fqcn(isolated_processor_registry) -> None:
     # Create two distinct classes with different FQCNs and register both under same short name.
     A = type("AmbigProc", (), {"__module__": "m1"})
     B = type("AmbigProc", (), {"__module__": "m2"})

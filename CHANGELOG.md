@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1: harden processor reference resolution with dotted-FQN support and deterministic ambiguity errors (FP0a1).
 - EIRv1: stabilize ProcessorRegistry short-name registration and dotted-FQN aliasing for parity work (FP0a2).
 - EIRv1 (FP0b): CanonicalSpec now canonicalizes Python processor classes to stable short-name refs (unless ambiguous → FQCN), aligning YAML and Python pipeline_id for scalar reference pipelines without churning YAML identities.
+- EIRv1 (FP0c0): EIR compiler normalizes node processor_ref to fully-qualified class names (FQCN), preventing registry-relative identity from leaking into compiled semantics; adds ProcessorRegistry test isolation.
 
 
 ## [v0.5.1] - Unreleased

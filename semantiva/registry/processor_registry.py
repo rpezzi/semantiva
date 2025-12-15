@@ -16,9 +16,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Sequence, Set
+from typing import Any, Dict, Iterable, Mapping, Sequence, Set
 import importlib
 import inspect
+import copy
 
 from semantiva.logger import Logger
 from semantiva.context_processors.context_processors import ContextProcessor
@@ -75,6 +76,45 @@ class ProcessorRegistry:
 
         plugin_registry._LOADED_EXTENSIONS.clear()
         cls._defaults_loaded = False
+
+    @classmethod
+    def _snapshot_state_for_tests(cls) -> Mapping[str, Any]:
+        """TEST-ONLY: Snapshot registry state for isolation.
+
+        This intentionally-private helper exists so tests can isolate global
+        registry mutations without fragile monkeypatching of internal attrs.
+        It must not be treated as public API.
+        """
+
+        # NOTE: Keep this in sync with internal storage that affects
+        # register_processor/get_processor/get_candidates resolution.
+        from . import plugin_registry
+
+        return {
+            "_processors": copy.deepcopy(cls._processors),
+            "_name_candidates": copy.deepcopy(cls._name_candidates),
+            "_registered_modules": copy.deepcopy(cls._registered_modules),
+            "_module_history": copy.deepcopy(cls._module_history),
+            "_defaults_loaded": cls._defaults_loaded,
+            "plugin_registry._LOADED_EXTENSIONS": copy.deepcopy(
+                plugin_registry._LOADED_EXTENSIONS
+            ),
+        }
+
+    @classmethod
+    def _restore_state_for_tests(cls, state: Mapping[str, Any]) -> None:
+        """TEST-ONLY: Restore registry state from snapshot."""
+        from . import plugin_registry
+
+        cls._processors = copy.deepcopy(state.get("_processors", {}))
+        cls._name_candidates = copy.deepcopy(state.get("_name_candidates", {}))
+        cls._registered_modules = copy.deepcopy(state.get("_registered_modules", set()))
+        cls._module_history = copy.deepcopy(state.get("_module_history", []))
+        cls._defaults_loaded = bool(state.get("_defaults_loaded", False))
+
+        plugin_registry._LOADED_EXTENSIONS = copy.deepcopy(
+            state.get("plugin_registry._LOADED_EXTENSIONS", set())
+        )
 
     @classmethod
     def register_processor(cls, name: str, proc_cls: type[Any]) -> None:
