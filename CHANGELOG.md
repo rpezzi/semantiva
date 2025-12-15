@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1: add Python peer reference suite specs for scalar pipelines (FP0a) and smoke coverage for legacy + EIR-scalar execution.
 - EIRv1: harden processor reference resolution with dotted-FQN support and deterministic ambiguity errors (FP0a1).
 - EIRv1: stabilize ProcessorRegistry short-name registration and dotted-FQN aliasing for parity work (FP0a2).
+- EIRv1 (FP0b): CanonicalSpec now canonicalizes Python processor classes to stable short-name refs (unless ambiguous → FQCN), aligning YAML and Python pipeline_id for scalar reference pipelines without churning YAML identities.
 
 
 ## [v0.5.1] - Unreleased

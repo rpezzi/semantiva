@@ -175,6 +175,23 @@ eir_series:
       gates:
         - "Short-name re-registration is idempotent"
         - "Dotted-FQN resolution registers stable alias key"
+    fp0b_canonical_spec_parity_scalar:
+      epic: FP0b
+      status: present
+      date: "2025-12-14"
+      artifacts:
+        - semantiva/pipeline/graph_builder.py
+        - tests/eir_frontend_parity/_normalize.py
+        - tests/eir_frontend_parity/test_canonical_spec_parity_scalar.py
+        - tests/eir_frontend_parity/test_graph_builder_identity_contracts.py
+      notes:
+        - "CanonicalSpec parity gate: YAML vs Python peer specs match for scalar reference pipelines."
+        - "Identity preserved for YAML: class refs canonicalize to short names unless ambiguous; ambiguity falls back to FQCN."
+        - "Canonicalization remains pure: no extension loading / registry mutation side effects."
+      gates:
+        - "CanonicalSpec bytes parity passes for float_ref_01 and float_ref_02"
+        - "pipeline_id parity passes for float_ref_01 and float_ref_02"
+        - "Drift locks: _NODE_NAMESPACE frozen; no extension loading in canonicalization"
   reference_suite:
     float:
     - id: float_ref_01
@@ -237,5 +254,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: R0c
-    date: '2025-12-14'
+    epic: FP0b
+    date: "2025-12-14"

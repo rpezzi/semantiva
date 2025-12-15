@@ -45,6 +45,7 @@ from semantiva.registry import resolve_parameters
 from semantiva.registry.descriptors import descriptor_to_json
 
 # Namespace used for deterministic node UUID generation
+# FP0b drift lock: DO NOT CHANGE without an explicit identity migration plan + approvals.
 _NODE_NAMESPACE = uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 
@@ -89,6 +90,12 @@ def _canonical_node(
     Canonicalization rules:
         - Sort mapping keys; strip whitespace/ordering artifacts; ignore cosmetic YAML noise.
 
+    FP0b identity rule (frontend parity):
+      - If processor is a string, processor_ref is that string.
+      - If processor is a class, processor_ref prefers the short name (Class.__name__)
+        unless that short name is ambiguous per ProcessorRegistry candidates; ambiguous
+        falls back to FQCN (module.qualname).
+
     Note: declaration_index and declaration_subindex provide a stable positional
     discriminator so that nodes with identical configuration but different
     declaration positions receive distinct UUIDs.
@@ -96,7 +103,14 @@ def _canonical_node(
     role = defn.get("role") or "processor"
     processor = defn.get("processor")
     if isinstance(processor, type):
-        processor = f"{processor.__module__}.{processor.__qualname__}"
+        short = processor.__name__
+        fqcn = f"{processor.__module__}.{processor.__qualname__}"
+        # Ambiguity signal comes from the registry candidate set.
+        # If the registry has no record, we still prefer short name for parity with YAML.
+        from semantiva.registry.processor_registry import ProcessorRegistry
+
+        cands = ProcessorRegistry.get_candidates(short)
+        processor = fqcn if len(cands) > 1 else short
     params = defn.get("parameters") or {}
     ports = defn.get("ports") or {}
     canon = {
@@ -128,6 +142,8 @@ def build_canonical_spec(
             canonical_spec: JSON-serializable GraphV1 mapping.
             resolved_spec:  List of node configs with descriptors for later
                             instantiation.
+    FP0b: Accept `processor_ref` as an alias of `processor`, but forbid providing both.
+
     """
     spec = _load_spec(pipeline_or_spec)
     nodes: List[dict[str, Any]] = []
@@ -136,6 +152,12 @@ def build_canonical_spec(
     for declaration_index, raw in enumerate(spec):
         declaration_subindex = 0
         cfg = preprocess_node_config(dict(raw))
+        if "processor_ref" in cfg:
+            if "processor" in cfg and cfg.get("processor") is not None:
+                raise ValueError(
+                    "Node config must not define both 'processor' and 'processor_ref'"
+                )
+            cfg["processor"] = cfg.pop("processor_ref")
         params = resolve_parameters(cfg.get("parameters", {}))
         cfg["parameters"] = params
         resolved.append(cfg)
