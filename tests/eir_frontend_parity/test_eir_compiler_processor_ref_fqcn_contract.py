@@ -50,6 +50,8 @@ def test_ambiguous_short_name_errors_deterministically(
     isolated_processor_registry,
 ) -> None:
     # Create two distinct classes with different FQCNs and register both under same short name.
+    from semantiva.registry.resolve import AmbiguousProcessorError
+
     A = type("AmbigProcEIR", (), {"__module__": "m1"})
     B = type("AmbigProcEIR", (), {"__module__": "m2"})
     ProcessorRegistry.register_processor("AmbigProcEIR", A)
@@ -63,10 +65,15 @@ pipeline:
       parameters: {}
 """
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(AmbiguousProcessorError) as exc_info:
         compile_eir_v1(bad)
 
     msg = str(exc_info.value)
     assert "AmbigProcEIR" in msg
     assert "Ambiguous" in msg
-    assert "FQCN" in msg or "fully-qualified" in msg or "dotted" in msg
+    assert (
+        "FQCN" in msg
+        or "fully-qualified" in msg
+        or "dotted" in msg
+        or "processor_ref" in msg
+    )

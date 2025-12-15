@@ -34,13 +34,13 @@ def simple_pipeline_config():
             "nodes": [
                 {
                     "name": "source",
-                    "processor": "semantiva.examples.test_utils.IntGenerator",
-                    "parameters": {"value": 42},
+                    "processor": "semantiva.examples.test_utils.FloatValueDataSource",
+                    "parameters": {"value": 42.0},
                 },
                 {
                     "name": "op",
-                    "processor": "semantiva.examples.test_utils.IntAdder",
-                    "parameters": {"increment": 10},
+                    "processor": "semantiva.examples.test_utils.FloatAddOperation",
+                    "parameters": {"addend": 10.0},
                 },
             ]
         }
@@ -55,12 +55,12 @@ def pipeline_with_context_keys():
             "nodes": [
                 {
                     "name": "source",
-                    "processor": "semantiva.examples.test_utils.IntGenerator",
+                    "processor": "semantiva.examples.test_utils.FloatValueDataSource",
                     "parameters": {},
                 },
                 {
                     "name": "op",
-                    "processor": "semantiva.examples.test_utils.IntAdder",
+                    "processor": "semantiva.examples.test_utils.FloatAddOperation",
                     "parameters": {},
                 },
             ]
@@ -205,14 +205,14 @@ def test_run_space_spec_id_when_present():
             "nodes": [
                 {
                     "name": "source",
-                    "processor": "semantiva.examples.test_utils.IntGenerator",
-                    "parameters": {"value": 42},
+                    "processor": "semantiva.examples.test_utils.FloatValueDataSource",
+                    "parameters": {"value": 42.0},
                 }
             ]
         },
         "run_space": {
             "sweep": [
-                {"context_key": "value", "values": [1, 2, 3]},
+                {"context_key": "value", "values": [1.0, 2.0, 3.0]},
             ]
         },
     }

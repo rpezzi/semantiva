@@ -37,12 +37,13 @@ import json
 import hashlib
 import uuid
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, cast
 
 import yaml
 from semantiva.pipeline.node_preprocess import preprocess_node_config
 from semantiva.registry import resolve_parameters
 from semantiva.registry.descriptors import descriptor_to_json
+from semantiva.registry.resolve import resolve_symbol
 
 # Namespace used for deterministic node UUID generation
 # FP0b drift lock: DO NOT CHANGE without an explicit identity migration plan + approvals.
@@ -86,38 +87,54 @@ def _canonical_node(
     """Return canonical node mapping used to derive node_uuid.
 
     Canonical fields:
-        - role, processor_ref, params (shallow), ports (declared), declaration_index, declaration_subindex
-    Canonicalization rules:
-        - Sort mapping keys; strip whitespace/ordering artifacts; ignore cosmetic YAML noise.
+        - role, processor_ref (dotted FQCN), params (shallow), ports (declared),
+          derive payload, declaration_index, declaration_subindex
 
-    FP0b identity rule (frontend parity):
-      - If processor is a string, processor_ref is that string.
-      - If processor is a class, processor_ref prefers the short name (Class.__name__)
-        unless that short name is ambiguous per ProcessorRegistry candidates; ambiguous
-        falls back to FQCN (module.qualname).
+    FP0d identity rule (frontend parity):
+      - Node config may specify either ``processor`` or ``processor_ref`` (mutually exclusive).
+      - Canonical processor_ref is always the dotted FQCN of the resolved class
+        (``<module>.<qualname>``) regardless of input form.
+      - Derived meaning remains structured via ``derive``; generated derived class
+        identity is not used for canonical identity.
 
     Note: declaration_index and declaration_subindex provide a stable positional
     discriminator so that nodes with identical configuration but different
     declaration positions receive distinct UUIDs.
     """
+
     role = defn.get("role") or "processor"
     processor = defn.get("processor")
-    if isinstance(processor, type):
-        short = processor.__name__
-        fqcn = f"{processor.__module__}.{processor.__qualname__}"
-        # Ambiguity signal comes from the registry candidate set.
-        # If the registry has no record, we still prefer short name for parity with YAML.
-        from semantiva.registry.processor_registry import ProcessorRegistry
+    processor_ref_in = defn.get("processor_ref")
 
-        cands = ProcessorRegistry.get_candidates(short)
-        processor = fqcn if len(cands) > 1 else short
-    params = defn.get("parameters") or {}
+    if processor is not None and processor_ref_in is not None:
+        raise ValueError(
+            "Node config must not set both 'processor' and 'processor_ref'"
+        )
+    if processor is None and processor_ref_in is None:
+        raise ValueError("Node config must set either 'processor' or 'processor_ref'")
+
+    if processor is not None:
+        if isinstance(processor, type):
+            proc_cls = processor
+        else:
+            # processor is expected to be a string here (short-name or FQN)
+            proc_cls = resolve_symbol(cast(str, processor))
+    else:
+        # processor_ref_in is expected to be a non-None string here
+        assert processor_ref_in is not None
+        proc_cls = resolve_symbol(cast(str, processor_ref_in))
+
+    canonical_processor_ref = f"{proc_cls.__module__}.{proc_cls.__qualname__}"
+
+    params = defn.get("parameters") or defn.get("params") or {}
     ports = defn.get("ports") or {}
+    derive = defn.get("derive")
     canon = {
         "role": role,
-        "processor_ref": processor,
+        "processor_ref": canonical_processor_ref,
         "params": params,
         "ports": ports,
+        "derive": derive,
         "declaration_index": declaration_index,
         "declaration_subindex": declaration_subindex,
     }
@@ -142,7 +159,11 @@ def build_canonical_spec(
             canonical_spec: JSON-serializable GraphV1 mapping.
             resolved_spec:  List of node configs with descriptors for later
                             instantiation.
-    FP0b: Accept `processor_ref` as an alias of `processor`, but forbid providing both.
+
+    FP0d: Node configs may specify either ``processor`` or ``processor_ref``
+    (mutually exclusive). Canonical processor_ref is always the dotted FQCN of
+    the resolved class; short-name ambiguity surfaces as an error during
+    resolution.
 
     """
     spec = _load_spec(pipeline_or_spec)
@@ -152,12 +173,14 @@ def build_canonical_spec(
     for declaration_index, raw in enumerate(spec):
         declaration_subindex = 0
         cfg = preprocess_node_config(dict(raw))
-        if "processor_ref" in cfg:
-            if "processor" in cfg and cfg.get("processor") is not None:
+        if "processor" in cfg and "processor_ref" in cfg:
+            if (
+                cfg.get("processor") is not None
+                and cfg.get("processor_ref") is not None
+            ):
                 raise ValueError(
                     "Node config must not define both 'processor' and 'processor_ref'"
                 )
-            cfg["processor"] = cfg.pop("processor_ref")
         params = resolve_parameters(cfg.get("parameters", {}))
         cfg["parameters"] = params
         resolved.append(cfg)

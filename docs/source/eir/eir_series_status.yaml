@@ -69,25 +69,25 @@ eir_series:
         eir_schema_v1_sha256: "3184521ddba89a4eaefbee345017969179c3452d2e386f05bc95871e9222b69b"
         compiled_identities:
           float_ref_01:
-            pipeline_id: "plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3"
-            pipeline_variant_id: "pvid-10450164ecd56153085f6c777a3369f2fd135c03a87de70630b368300d7ccd72"
-            eir_id: "eirid-b74100b54e2713e5781709aca737abc1988f5e6ec680a1d10425cd954a828e6d"
+            pipeline_id: "plid-0a73a3ace43f7cd7702c0c19a32ff8dcf392fa03a1fecb9d3c1b86f735121ccb"
+            pipeline_variant_id: "pvid-bb31791ff0110c1c0c409a77d13d7c143c942b18faf0f6e048c48e10fd2edea5"
+            eir_id: "eirid-6197a888a98f3aeff79e4ec4e36aab52bc8ef4b1afe3d30fcb0713cffa9b2823"
           float_ref_02:
-            pipeline_id: "plid-dbf8fa82954040c7262e23f3722707f9e7213ae9bf1ceba047198065fc29620e"
-            pipeline_variant_id: "pvid-bd539ba2035d3e772492d6735e71835a4b786ac626d468d31a5e09d5a3cf2a82"
-            eir_id: "eirid-411f409b0f546c5e88dc944a809abc8b2d32d81344d184a85f84404df0039917"
+            pipeline_id: "plid-49e23aa7604efef7f00554fdef349e0c5ab06db13b8a96049c7255d174885b61"
+            pipeline_variant_id: "pvid-0f3b558abe16b33971ab82d51657a849813a76bc98fe188bc4b4219cd5cab5f2"
+            eir_id: "eirid-131224c15f86d8dcc2300953e9ee4e040df595e86478a00e9d80c749f2c6459f"
           float_ref_channel_01:
-            pipeline_id: "plid-cc1fa01b97231217e0a2ad472d95be1789864c3a11a1c6fee3999909a0ba629a"
-            pipeline_variant_id: "pvid-b71795f71e248ae479d3dcdc0f5b65f30d74d0afe32c7637a5663f5ae368b30e"
-            eir_id: "eirid-195922a9db9aa39aef7ce7e92769e0f9dfb43d468ff31304eca9db98defd9420"
+            pipeline_id: "plid-fb115f78ce13fbfbc92707d74e5f269c62c1ea736f725c05294ce929d34f65ec"
+            pipeline_variant_id: "pvid-cdfd9a807569f6e9b5b50d5c2b58fcf0111761b93a5f71a8d58dd624707874ba"
+            eir_id: "eirid-8109934f107dc75b2761feb74b8508c9ecfbdd3f08e475b8c080b2168f0a86e3"
           float_ref_slots_01:
-            pipeline_id: "plid-cc88682c597f0eebe6c34653b114665645b331218bf343171955908be6f3b79c"
-            pipeline_variant_id: "pvid-0cf88a9c26ceeefb909ca8744ca7b784899ff197314697e45c42cb154dae4ed3"
-            eir_id: "eirid-52fe68d42e14fe38368bbfb8ea671c8fabaf30ba27cfc48b5a56093f4f18e6dc"
+            pipeline_id: "plid-e208eaedfa03ce4dbcc66f0f09b74025126f8fad06f7e9242f9a249af39e5f0b"
+            pipeline_variant_id: "pvid-23ce317eeb5f8bd5ccf97268687346d8086601fb92b3d12798353be66652efe4"
+            eir_id: "eirid-7090cb7cb94a75072efd8020f9e71fc15cfff989f067212cbe63f025a4b2e60d"
           float_ref_lane_01:
-            pipeline_id: "plid-5e25e7a153ea053946caf69160744c53649be5836c437789ff5f7d912e646cbc"
-            pipeline_variant_id: "pvid-c923fbf9200928a5953c1aaf6b16cbe8877c196d25042c1fd2d653bd4c84fbc5"
-            eir_id: "eirid-241a8f2eae8c530e422c4a996fac8e5124937624a39f983102707a498f23a0c1"
+            pipeline_id: "plid-9dbf70cc5fa63a870384179b1ad1616d79b30c234f4c96d7841ec809c5688579"
+            pipeline_variant_id: "pvid-59af43432f1c1712c206304f2d2c1bebfddba64b90533a6e35a4f6d3016657de"
+            eir_id: "eirid-b0d3a78eb1f2d60a19bf094b11fb57cf32677e4e8c576f7384647d89885775f2"
   phase_3:
     r0a_eir_scalar_execution_harness:
       epic: R0a
@@ -224,12 +224,34 @@ eir_series:
         - "Normalized EIR bytes parity passes for float_ref_01 and float_ref_02 (YAML vs Python)"
         - "Schema validation passes for both frontends"
         - "Repeat-build determinism holds per frontend after normalization"
+    fp0d_canonical_identity_finalization_fqcn_only:
+      epic: FP0d
+      status: present
+      date: "2025-12-15"
+      artifacts:
+        - semantiva/pipeline/graph_builder.py
+        - tests/eir_frontend_parity/test_graph_builder_identity_contracts.py
+        - tests/eir_frontend_parity/test_canonical_spec_parity_scalar.py
+      notes:
+        - "ONE-TIME identity migration: CanonicalSpec processor_ref is now FQCN-only (<module>.<qualname>) for all nodes."
+        - "Node configs accept either processor or processor_ref (mutually exclusive); ambiguous short names must error."
+        - "Derived meaning remains (base processor_ref + derive payload); generated derived class identity is not semantic."
+        - "After FP0d, identity canonicalization inputs are frozen for the series unless a new explicit identity epic is created (not planned)."
+      compiled_identities:
+        float_ref_01:
+          pipeline_id: "plid-0a73a3ace43f7cd7702c0c19a32ff8dcf392fa03a1fecb9d3c1b86f735121ccb"
+        float_ref_02:
+          pipeline_id: "plid-49e23aa7604efef7f00554fdef349e0c5ab06db13b8a96049c7255d174885b61"
+      gates:
+        - "CanonicalSpec parity (FP0b) remains green for scalar refs with FQCN identity"
+        - "Compiled artifact parity (FP0c) remains green for scalar refs"
+        - "Identity contracts: mutual exclusion; ambiguity errors deterministic; no extension loading during canonicalization"
   reference_suite:
     float:
     - id: float_ref_01
       yaml_path: tests/eir_reference_suite/float_ref_01.yaml
       yaml_sha256: 24366dcfc0d3b726db02d61c0ae53c7f5a7d431307d1ee56ce08a71ed8e6e7df
-      pipeline_id: plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3
+      pipeline_id: plid-0a73a3ace43f7cd7702c0c19a32ff8dcf392fa03a1fecb9d3c1b86f735121ccb
       runtime_contract:
         initial_context:
           value: 1.0
@@ -241,7 +263,7 @@ eir_series:
     - id: float_ref_02
       yaml_path: tests/eir_reference_suite/float_ref_02.yaml
       yaml_sha256: ecdfe8214c6085c57579b4d2bdaf02c9fa214b8f2a54df1b104eb9e6f82dff7e
-      pipeline_id: plid-dbf8fa82954040c7262e23f3722707f9e7213ae9bf1ceba047198065fc29620e
+      pipeline_id: plid-49e23aa7604efef7f00554fdef349e0c5ab06db13b8a96049c7255d174885b61
       runtime_contract:
         initial_context:
           value: 2.0
@@ -253,7 +275,7 @@ eir_series:
     - id: float_ref_channel_01
       yaml_path: tests/eir_reference_suite/float_ref_channel_01.yaml
       yaml_sha256: 806457a3820b22259fc42572c9086f9c9f308afe6c5235152a65f4a36eeea338
-      pipeline_id: plid-cc1fa01b97231217e0a2ad472d95be1789864c3a11a1c6fee3999909a0ba629a
+      pipeline_id: plid-fb115f78ce13fbfbc92707d74e5f269c62c1ea736f725c05294ce929d34f65ec
       runtime_contract:
         initial_context:
           value: 1.5
@@ -264,7 +286,7 @@ eir_series:
     - id: float_ref_slots_01
       yaml_path: tests/eir_reference_suite/float_ref_slots_01.yaml
       yaml_sha256: 629c53586857ce190276fa51a3d423be538afe3e101dc4906aabfe0cd8216202
-      pipeline_id: plid-cc88682c597f0eebe6c34653b114665645b331218bf343171955908be6f3b79c
+      pipeline_id: plid-e208eaedfa03ce4dbcc66f0f09b74025126f8fad06f7e9242f9a249af39e5f0b
       runtime_contract:
         initial_context:
           value: 1.0
@@ -275,7 +297,7 @@ eir_series:
     - id: float_ref_lane_01
       yaml_path: tests/eir_reference_suite/float_ref_lane_01.yaml
       yaml_sha256: a801419b24edbae9440e51dd8558c7f9339c1b15464d4aea2198f1cfdcd8df03
-      pipeline_id: plid-5e25e7a153ea053946caf69160744c53649be5836c437789ff5f7d912e646cbc
+      pipeline_id: plid-9dbf70cc5fa63a870384179b1ad1616d79b30c234f4c96d7841ec809c5688579
       runtime_contract:
         initial_context:
           lane_values:
@@ -286,5 +308,5 @@ eir_series:
           data_float: 2.5
           context_keys_added: []
   last_updated:
-    epic: FP0c
+    epic: FP0d
     date: "2025-12-15"

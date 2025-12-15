@@ -47,16 +47,27 @@ class TestSemantivaExamplesExtension:
         assert processor_cls.__name__ == "FloatCollectValueProbe"
 
     def test_examples_not_available_without_extension(self):
-        """Test that example processors are not available by default."""
+        """Test that example processors are not registered without loading the extension.
+
+        After FP0d, processors can still be resolved via dotted FQN import even if
+        not registered. This test verifies they're NOT registered by short name without
+        explicitly loading the extension.
+        """
         # Clear registry and load only defaults (without examples)
         ProcessorRegistry.clear()
         from semantiva.registry.bootstrap import DEFAULT_MODULES
 
         ProcessorRegistry.register_modules(DEFAULT_MODULES)
 
-        # Verify that example processors are NOT available
-        with pytest.raises(Exception):  # Should raise UnknownProcessorError or similar
-            resolve_symbol("FloatValueDataSource")
+        # Verify that example processors are NOT available by short name
+        with pytest.raises(KeyError):
+            # Should fail - short name not registered without extension
+            ProcessorRegistry.get_processor("FloatValueDataSource")
+
+        # But dotted FQN should still work (FP0d automatic import feature)
+        resolved = resolve_symbol("semantiva.examples.test_utils.FloatValueDataSource")
+        assert resolved is not None
+        assert resolved.__name__ == "FloatValueDataSource"
 
     def test_extension_multiple_loads_idempotent(self):
         """Test that loading the extension multiple times is safe."""
