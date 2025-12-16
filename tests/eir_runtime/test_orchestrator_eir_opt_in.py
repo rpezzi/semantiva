@@ -94,15 +94,21 @@ def test_orchestrator_unknown_backend() -> None:
         )
 
 
-def test_orchestrator_eir_scalar_rejects_non_path() -> None:
-    orch = LocalSemantivaOrchestrator()
-    payload = Payload(NoDataType(), ContextType({}))
+def test_orchestrator_opt_in_eir_scalar_accepts_python_list_spec() -> None:
+    from tests.eir_reference_suite_python.float_ref_01 import (
+        build_pipeline_spec as build_py_ref_01,
+    )
 
-    with pytest.raises(TypeError):
-        orch.execute(
-            pipeline_spec=[],
-            payload=payload,
-            transport=InMemorySemantivaTransport(),
-            logger=Logger(),
-            execution_backend="eir_scalar",
-        )
+    orch = LocalSemantivaOrchestrator()
+    spec = build_py_ref_01()
+    payload = Payload(NoDataType(), ContextType({"value": 1.0, "addend": 2.0}))
+
+    out = orch.execute(
+        pipeline_spec=spec,
+        payload=payload,
+        transport=InMemorySemantivaTransport(),
+        logger=Logger(),
+        execution_backend="eir_scalar",
+    )
+
+    assert out.data.data == 3.0

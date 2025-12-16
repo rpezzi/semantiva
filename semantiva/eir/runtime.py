@@ -97,19 +97,31 @@ def _resolved_nodes_from_eir(
     return canonical, resolved
 
 
+def build_scalar_specs_from_pipeline_spec(
+    pipeline_or_spec: Any,
+) -> Tuple[dict[str, Any], List[dict[str, Any]]]:
+    """
+    Compile a pipeline specification (YAML path or Python node list) into EIRv1 and
+    return canonical/resolved specs for scalar execution.
+
+    This helper intentionally constrains scope to classic_linear scalar pipelines for
+    the FP-series opt-in execution backend. It serves orchestrator routing to reuse
+    the legacy SER lifecycle while sourcing execution order and parameters from the
+    compiled EIR document.
+    """
+
+    eir = compile_eir_v1(pipeline_or_spec)
+    return _resolved_nodes_from_eir(eir)
+
+
 def build_scalar_specs_from_yaml(
     pipeline_yaml_path: str,
 ) -> Tuple[dict[str, Any], List[dict[str, Any]]]:
     """
-    Compile a pipeline YAML into EIRv1 and return canonical/resolved specs for scalar execution.
-
-    This helper intentionally constrains scope to classic_linear scalar pipelines for R0c
-    opt-in routing. It serves orchestrator routing to reuse the legacy SER lifecycle while
-    sourcing execution order and parameters from the compiled EIR document.
+    Backward-compatible wrapper around build_scalar_specs_from_pipeline_spec.
     """
 
-    eir = compile_eir_v1(pipeline_yaml_path)
-    return _resolved_nodes_from_eir(eir)
+    return build_scalar_specs_from_pipeline_spec(pipeline_yaml_path)
 
 
 def run_eir_scalar_from_yaml(
@@ -126,6 +138,7 @@ def run_eir_scalar_from_yaml(
 
 
 __all__: Sequence[str] = [
+    "build_scalar_specs_from_pipeline_spec",
     "build_scalar_specs_from_yaml",
     "run_eir_scalar_from_yaml",
 ]

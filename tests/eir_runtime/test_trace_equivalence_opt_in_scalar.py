@@ -116,3 +116,57 @@ def test_trace_equivalence_legacy_vs_eir_scalar_float_ref_01(tmp_path: Path) -> 
     eir = [_normalize(x) for x in eir_raw]
 
     assert legacy == eir
+
+
+def test_trace_equivalence_legacy_vs_eir_scalar_float_ref_01_python_spec(
+    tmp_path: Path,
+) -> None:
+    from tests.eir_reference_suite_python.float_ref_01 import (
+        build_pipeline_spec as build_py_ref_01,
+    )
+
+    spec = build_py_ref_01()
+    payload_legacy = Payload(NoDataType(), ContextType({"value": 1.0, "addend": 2.0}))
+    payload_eir = Payload(NoDataType(), ContextType({"value": 1.0, "addend": 2.0}))
+
+    legacy_path = tmp_path / "legacy_py.jsonl"
+    eir_path = tmp_path / "eir_py.jsonl"
+
+    validator = _validator()
+
+    orch_legacy = LocalSemantivaOrchestrator()
+    orch_eir = LocalSemantivaOrchestrator()
+
+    tracer_legacy = JsonlTraceDriver(str(legacy_path))
+    tracer_eir = JsonlTraceDriver(str(eir_path))
+
+    orch_legacy.execute(
+        pipeline_spec=spec,
+        payload=payload_legacy,
+        transport=InMemorySemantivaTransport(),
+        logger=Logger(),
+        trace=tracer_legacy,
+    )
+    orch_eir.execute(
+        pipeline_spec=spec,
+        payload=payload_eir,
+        transport=InMemorySemantivaTransport(),
+        logger=Logger(),
+        trace=tracer_eir,
+        execution_backend="eir_scalar",
+    )
+
+    tracer_legacy.close()
+    tracer_eir.close()
+
+    legacy_raw = _load_jsonl(legacy_path)
+    eir_raw = _load_jsonl(eir_path)
+
+    for rec in legacy_raw + eir_raw:
+        if rec.get("record_type") == "ser":
+            validator.validate(rec)
+
+    legacy = [_normalize(x) for x in legacy_raw]
+    eir = [_normalize(x) for x in eir_raw]
+
+    assert legacy == eir

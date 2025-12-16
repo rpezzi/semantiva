@@ -288,6 +288,25 @@ eir_series:
         - "YAML legacy == YAML EIR (locked parity)."
         - "Python legacy == Python EIR (locked parity)."
         - "YAML legacy == Python legacy (locked parity)."
+    fp3_execution_path_selection_uniform_frontends:
+      epic: FP3
+      status: done
+      date: "2025-12-16"
+      artifacts:
+        - semantiva/execution/orchestrator/orchestrator.py
+        - semantiva/eir/runtime.py
+        - tests/eir_runtime/test_opt_in_selection_uniform_frontends.py
+        - tests/eir_runtime/test_orchestrator_eir_opt_in.py
+        - tests/eir_runtime/test_trace_equivalence_opt_in_scalar.py
+        - docs/source/eir/eir_series_status.yaml
+      notes:
+        - "Extends opt-in execution_backend='eir_scalar' routing to accept Python list-of-node-dicts pipeline specs."
+        - "Legacy remains default; selector is now uniformly reachable from YAML and Python workflows."
+        - "Adds regression locks for uniform selector reachability and trace equivalence."
+      gates:
+        - "Frontend parity program gate remains green (FP2)."
+        - "Opt-in selector works for YAML and Python inputs."
+        - "Legacy remains default for both frontends."
   reference_suite:
     float:
     - id: float_ref_01

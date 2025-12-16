@@ -151,14 +151,19 @@ class SemantivaOrchestrator(ABC):
                     else []
                 )
         elif execution_backend == "eir_scalar":
-            if not isinstance(pipeline_spec, str):
+            from semantiva.eir.runtime import build_scalar_specs_from_pipeline_spec
+
+            if not isinstance(pipeline_spec, (str, list, tuple)) and not hasattr(
+                pipeline_spec, "pipeline_configuration"
+            ):
                 raise TypeError(
-                    "eir_scalar execution backend requires pipeline_spec to be a YAML path string"
+                    "eir_scalar execution backend requires pipeline_spec to be a YAML path string "
+                    "or a Python list/tuple of node dicts (or a Pipeline-like object)."
                 )
 
-            from semantiva.eir.runtime import build_scalar_specs_from_yaml
-
-            canonical, resolved_spec = build_scalar_specs_from_yaml(pipeline_spec)
+            canonical, resolved_spec = build_scalar_specs_from_pipeline_spec(
+                pipeline_spec
+            )
         else:
             raise ValueError(f"Unknown execution_backend: {execution_backend}")
 
