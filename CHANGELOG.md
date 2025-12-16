@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - EIRv1 (FP1a): enforce “no bypass” CanonicalSpec convergence for YAML+Python compilation via frontend parity tests (no runtime behavior change).
 - EIRv1 (FP1b): add CanonicalPipelineSpecV1 pre-flight validation with stable, frontend-tagged diagnostics + scalar validation parity tests (no runtime behavior change).
 - EIRv1 (FP1c): add derived reference pipelines (slice + parameter_sweep) for YAML+Python and enforce CanonicalSpec parity with legacy execution smoke coverage.
+- EIRv1 (FP2): add runtime parity matrix tests for scalar reference suite across YAML and Python frontends (legacy vs EIR-scalar), using locked equality (exact float + exact context dict).
 
 
 ## [v0.5.1] - Unreleased

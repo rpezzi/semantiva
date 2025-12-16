@@ -267,6 +267,27 @@ eir_series:
         - "CanonicalSpec bytes parity passes for float_ref_slice_01 and float_ref_sweep_01"
         - "pipeline_id parity passes for float_ref_slice_01 and float_ref_sweep_01"
         - "Legacy execution smoke passes for derived YAML and Python specs"
+    fp2_runtime_parity_matrix_scalar:
+      epic: FP2
+      status: present
+      date: "2025-12-16"
+      artifacts:
+        - tests/eir_runtime/test_runtime_parity_matrix_scalar.py
+        - tests/eir_reference_suite/float_ref_01.yaml
+        - tests/eir_reference_suite/float_ref_02.yaml
+        - tests/eir_reference_suite_python/float_ref_01.py
+        - tests/eir_reference_suite_python/float_ref_02.py
+        - docs/source/eir/eir_series_status.yaml
+      notes:
+        - "Runtime parity gate for scalar reference suite using explicit 2×2 matrix (YAML/Python × legacy/EIR-scalar)."
+        - "Parity definition is locked: float scalar values match exactly; context dictionaries match exactly."
+        - "Includes recommended YAML-legacy vs Python-legacy comparison to prove frontend equivalence independent of EIR."
+        - "Does not admit derived pipelines to EIR-backed runtime parity (those remain post-FP2)."
+      gates:
+        - "All four matrix cells execute for float_ref_01 and float_ref_02."
+        - "YAML legacy == YAML EIR (locked parity)."
+        - "Python legacy == Python EIR (locked parity)."
+        - "YAML legacy == Python legacy (locked parity)."
   reference_suite:
     float:
     - id: float_ref_01
