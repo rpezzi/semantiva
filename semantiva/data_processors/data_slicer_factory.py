@@ -17,7 +17,7 @@
 Provides utilities for extracting subsets from data collections.
 """
 
-from typing import Type, List, Any
+from typing import Any, Dict, List, Type
 from semantiva.data_types.data_types import DataCollectionType
 from semantiva.data_processors.data_processors import (
     _BaseDataProcessor,
@@ -61,6 +61,8 @@ class _SlicingDataProcessorFactory:
                 """
 
                 data_type_override = input_data_collection_type
+                _slice_element = processor_class
+                _slice_collection = input_data_collection_type
 
                 @classmethod
                 def input_data_type(cls) -> type[DataCollectionType]:
@@ -89,6 +91,17 @@ class _SlicingDataProcessorFactory:
 
                     return processed_data
 
+                @classmethod
+                def _define_metadata(cls) -> Dict[str, Any]:
+                    meta = dict(super()._define_metadata())
+                    meta["preprocessor"] = {
+                        "type": "derive.slice",
+                        "version": 1,
+                        "element_ref": f"{cls._slice_element.__module__}.{cls._slice_element.__qualname__}",
+                        "collection": f"{cls._slice_collection.__module__}.{cls._slice_collection.__qualname__}",
+                    }
+                    return meta
+
             SlicingDataOperator.__name__ = class_name
             SlicingDataOperator.__doc__ = f"{SlicingDataOperator.__doc__} For each element in the collection: {processor_class.__doc__}"
             return SlicingDataOperator
@@ -101,6 +114,8 @@ class _SlicingDataProcessorFactory:
                 """
 
                 input_data_type_override = input_data_collection_type
+                _slice_element = processor_class
+                _slice_collection = input_data_collection_type
 
                 @classmethod
                 def input_data_type(cls) -> type[DataCollectionType]:
@@ -124,6 +139,17 @@ class _SlicingDataProcessorFactory:
                         )
 
                     return probed_results
+
+                @classmethod
+                def _define_metadata(cls) -> Dict[str, Any]:
+                    meta = dict(super()._define_metadata())
+                    meta["preprocessor"] = {
+                        "type": "derive.slice",
+                        "version": 1,
+                        "element_ref": f"{cls._slice_element.__module__}.{cls._slice_element.__qualname__}",
+                        "collection": f"{cls._slice_collection.__module__}.{cls._slice_collection.__qualname__}",
+                    }
+                    return meta
 
             SlicingDataProbe.__name__ = class_name
 

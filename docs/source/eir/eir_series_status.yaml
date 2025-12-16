@@ -246,6 +246,27 @@ eir_series:
         - "CanonicalSpec parity (FP0b) remains green for scalar refs with FQCN identity"
         - "Compiled artifact parity (FP0c) remains green for scalar refs"
         - "Identity contracts: mutual exclusion; ambiguity errors deterministic; no extension loading during canonicalization"
+    fp1c_derived_processor_parity_scaffolding:
+      epic: FP1c
+      status: present
+      date: "2025-12-16"
+      artifacts:
+        - tests/eir_reference_suite/float_ref_slice_01.yaml
+        - tests/eir_reference_suite_python/float_ref_slice_01.py
+        - tests/eir_reference_suite/float_ref_sweep_01.yaml
+        - tests/eir_reference_suite_python/float_ref_sweep_01.py
+        - tests/eir_frontend_parity/test_canonical_spec_parity_derived.py
+        - tests/eir_runtime/test_legacy_execution_smoke_derived.py
+        - semantiva/pipeline/graph_builder.py
+        - semantiva/data_processors/data_slicer_factory.py
+        - semantiva/examples/test_utils.py
+      notes:
+        - "Adds derived pipeline fixtures (slice + sweep) and enforces CanonicalSpec parity across YAML and Python."
+        - "Derived meaning represented via CanonicalSpec.derive; generated class identity not used for pipeline/node identity."
+      gates:
+        - "CanonicalSpec bytes parity passes for float_ref_slice_01 and float_ref_sweep_01"
+        - "pipeline_id parity passes for float_ref_slice_01 and float_ref_sweep_01"
+        - "Legacy execution smoke passes for derived YAML and Python specs"
   reference_suite:
     float:
     - id: float_ref_01
@@ -307,6 +328,33 @@ eir_series:
         expected:
           data_float: 2.5
           context_keys_added: []
+    - id: float_ref_slice_01
+      yaml_path: tests/eir_reference_suite/float_ref_slice_01.yaml
+      yaml_sha256: 85f45f76a8f921d562efeb3535f4a7724b61e87b43b42fe20628d20c7c6577a4
+      pipeline_id: plid-e90b46d926ef5d4bd88a9c7589628e4427cd81a6ca6f590094370b349774fde8
+      runtime_contract:
+        initial_context:
+          values:
+          - 1.0
+          - 2.0
+          - 3.0
+          factor: 10.0
+        expected:
+          data_float: 60.0
+          context_keys_added:
+          - result
+    - id: float_ref_sweep_01
+      yaml_path: tests/eir_reference_suite/float_ref_sweep_01.yaml
+      yaml_sha256: 8df1d5b5dc0689e50e183a56691bdaff3ca5e8fa320848802484bfc2f16b8839
+      pipeline_id: plid-6b59fca9bb30f77e12516de45983ef6e398205aa2e7a883a3387f3152ef72d6e
+      runtime_contract:
+        initial_context:
+          value: 1.0
+        expected:
+          data_float: 9.0
+          context_keys_added:
+          - result
   last_updated:
-    epic: FP0d
-    date: "2025-12-15"
+    epic: FP1c
+    date: "2025-12-16"
+    note: "Added derived processor parity scaffolding (slice + sweep) reference pipelines and CanonicalSpec parity tests."

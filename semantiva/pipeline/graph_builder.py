@@ -37,7 +37,7 @@ import json
 import hashlib
 import uuid
 from pathlib import Path
-from typing import Any, List, cast
+from typing import Any, List, cast, Type
 
 import yaml
 from semantiva.pipeline.node_preprocess import preprocess_node_config
@@ -129,6 +129,46 @@ def _canonical_node(
     params = defn.get("parameters") or defn.get("params") or {}
     ports = defn.get("ports") or {}
     derive = defn.get("derive")
+    preproc = None
+
+    # Derived processor normalization: prefer base element_ref + structured derive payload.
+    # Avoid eager metadata calls for non-derived processors. Only call
+    # `_define_metadata` on classes that are semantiva components to satisfy mypy.
+    try:
+        from semantiva.core.semantiva_component import _SemantivaComponent
+
+        is_semantiva_component = isinstance(proc_cls, type) and issubclass(
+            cast(type, proc_cls), _SemantivaComponent
+        )
+    except Exception:
+        # In case of import cycles or other import errors, conservatively avoid
+        # calling into metadata.
+        is_semantiva_component = False
+
+    if is_semantiva_component and (
+        hasattr(proc_cls, "_element") or hasattr(proc_cls, "_slice_element")
+    ):
+        try:
+            # Narrow proc_cls for the type checker and call _define_metadata
+            meta = cast(
+                dict[str, Any],
+                cast(Type[_SemantivaComponent], proc_cls)._define_metadata(),
+            )
+            preproc = meta.get("preprocessor") if isinstance(meta, dict) else None
+        except Exception:  # pragma: no cover - defensive: metadata should not raise
+            preproc = None
+
+    if isinstance(preproc, dict):
+        ptype = preproc.get("type")
+        element_ref = preproc.get("element_ref")
+        if isinstance(element_ref, str) and element_ref:
+            if ptype in {"derive.parameter_sweep", "derive.slice"}:
+                canonical_processor_ref = element_ref
+                if derive is None:
+                    if ptype == "derive.parameter_sweep":
+                        derive = {"parameter_sweep": dict(preproc)}
+                    elif ptype == "derive.slice":
+                        derive = {"slice": dict(preproc)}
     canon = {
         "role": role,
         "processor_ref": canonical_processor_ref,

@@ -1,0 +1,11 @@
+# tests/eir_reference_suite/float_ref_slice_01.yaml
+# Reference pipeline (float_ref_slice_01): collection source -> slice(multiply) -> sum -> probe
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatCollectionFromContextSource
+    - processor: "slice:FloatMultiplyOperation:FloatDataCollection"
+    - processor: FloatCollectionSumOperation
+    - processor: FloatCollectValueProbe
+      context_key: "result"

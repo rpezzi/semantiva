@@ -267,6 +267,18 @@ class FloatValueDataSource(DataSource):
         return FloatDataType
 
 
+class FloatCollectionFromContextSource(DataSource):
+    """Load a FloatDataCollection from a context-provided list of float values."""
+
+    @classmethod
+    def output_data_type(cls):
+        return FloatDataCollection
+
+    @classmethod
+    def _get_data(cls, values: list[float]) -> FloatDataCollection:
+        return FloatDataCollection([FloatDataType(float(v)) for v in values])
+
+
 class FloatLaneBundleFromContextSource(DataSource):
     """Outputs a LaneBundleDataType from a context-provided mapping lane->float."""
 

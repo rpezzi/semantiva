@@ -1,0 +1,19 @@
+# tests/eir_reference_suite/float_ref_sweep_01.yaml
+# Reference pipeline (float_ref_sweep_01): scalar source -> sweep(add) -> sum -> probe
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatAddOperation
+      derive:
+        parameter_sweep:
+          parameters:
+            addend: "t"
+          variables:
+            t: [1.0, 2.0, 3.0]
+          collection: FloatDataCollection
+          mode: "combinatorial"
+    - processor: FloatCollectionSumOperation
+    - processor: FloatCollectValueProbe
+      context_key: "result"
