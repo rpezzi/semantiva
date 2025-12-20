@@ -17,3 +17,7 @@
 Phase A foundation modules: schema validation and deterministic JSON utilities.
 Runtime/identity wiring is intentionally out of scope for Epic A1.
 """
+
+from semantiva.pipeline.cpsv1.derived_edges import derive_edges_v1
+
+__all__ = ["derive_edges_v1"]
