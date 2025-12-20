@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://semantiva.org/schema/canonical_pipeline_spec_v1.schema.json",
+  "title": "Semantiva CanonicalPipelineSpecV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "nodes"],
+  "properties": {
+    "version": { "const": 1 },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/CanonicalNodeV1" }
+    }
+  },
+  "$defs": {
+    "CanonicalJsonValue": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/CanonicalJsonValue" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/CanonicalJsonValue" }
+        }
+      ]
+    },
+    "SourceRefV1": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(channel|context):[A-Za-z0-9_\\-\\.]+$"
+    },
+    "PublishV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channels", "context_key"],
+      "properties": {
+        "channels": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 },
+          "required": ["out"],
+          "properties": {
+            "out": { "type": "string", "minLength": 1 }
+          }
+        },
+        "context_key": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "BindMapV1": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/SourceRefV1" },
+      "required": ["data"],
+      "properties": {
+        "data": { "$ref": "#/$defs/SourceRefV1" }
+      }
+    },
+    "CanonicalNodeV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_uuid",
+        "role",
+        "processor_ref",
+        "parameters",
+        "ports",
+        "derive",
+        "bind",
+        "publish",
+        "declaration_index",
+        "declaration_subindex"
+      ],
+      "properties": {
+        "node_uuid": { "type": "string", "minLength": 1, "format": "uuid" },
+        "role": { "type": "string", "minLength": 1, "default": "processor" },
+        "processor_ref": { "type": "string", "minLength": 1 },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/CanonicalJsonValue" }
+        },
+        "ports": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/CanonicalJsonValue" }
+        },
+        "derive": {
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["version"],
+              "properties": {
+                "version": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": { "$ref": "#/$defs/CanonicalJsonValue" }
+            }
+          ]
+        },
+        "bind": { "$ref": "#/$defs/BindMapV1" },
+        "publish": { "$ref": "#/$defs/PublishV1" },
+        "declaration_index": { "type": "integer", "minimum": 0 },
+        "declaration_subindex": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "DerivedEdgeV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_node_uuid", "target_node_uuid", "target_param", "source_ref"],
+      "properties": {
+        "source_node_uuid": { "type": "string", "minLength": 1, "format": "uuid" },
+        "target_node_uuid": { "type": "string", "minLength": 1, "format": "uuid" },
+        "target_param": { "type": "string", "minLength": 1 },
+        "source_ref": { "$ref": "#/$defs/SourceRefV1" },
+        "source_output_slot": { "type": "string", "minLength": 1, "default": "out" }
+      }
+    }
+  }
+}

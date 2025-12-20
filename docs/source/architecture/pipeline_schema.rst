@@ -72,6 +72,22 @@ Common node keys include:
 The loader enforces that ``parameters`` is a mapping when present, and that
 derived tools receive the correct shape.
 
+Canonical meaning layer (CPSV1)
+-------------------------------
+
+Semantiva is introducing a frontend-agnostic **CanonicalPipelineSpecV1 (CPSV1)**
+as a machine-validated canonical meaning representation for pipelines.
+
+- JSON Schema location (packaged): ``semantiva/pipeline/schema/canonical_pipeline_spec_v1.schema.json``
+- CPSV1 is **normative only**: derived/non-normative views are not part of CPSV1 and will
+  be emitted separately (e.g. under ``eir.derived.*`` in compiled artifacts).
+- Canonical CPSV1 is **explicit** about default-flow:
+  every node includes ``publish.channels.out`` and ``bind.data`` (typically ``"primary"``
+  and ``"channel:primary"`` respectively).
+
+This page continues to describe the authoring YAML surface; CPSV1 is an internal
+canonical form used to harden validation and deterministic identity in later phases.
+
 Run-space schema
 ----------------
 
