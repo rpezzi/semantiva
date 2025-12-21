@@ -26,6 +26,19 @@ context processors, sinks) and keep the **data** and **context**
 channels separate for traceability. Probes remain read-only and write
 results into context via the node's ``context_key``.
 
+.. rubric:: Slots as parameters (bind + named channels)
+
+Semantiva supports *slot binding* for multi-input processors via ``bind:``, and
+publishing to named channels via ``data_key:``.
+
+- ``bind`` maps a processor parameter to a source:
+  - ``primary`` (or any unprefixed name) means ``channel:<name>``
+  - explicit forms: ``channel:<name>`` or ``context:<key>``
+- Any ``bind`` key other than ``data`` must match a real processor parameter;
+  semantic validation rejects typos or unknown targets.
+- ``data_key`` publishes the node's ``out`` result to the named channel.
+  The default publication is ``primary``.
+
 Running a YAML pipeline
 -----------------------
 

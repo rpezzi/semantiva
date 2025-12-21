@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added CanonicalPipelineSpecV1 (CPSV1) packaged JSON Schema + strict stable JSON utilities (Phase A foundations; no runtime behavior change).
 - Added deterministic derived-edge utility for CanonicalPipelineSpecV1 along with regression coverage for topology errors.
 - Added EIRv1 series scaffolding (docs SSOT + float reference suite harness) with no runtime behavior changes.
+- Added CPSV1 canonicalizer with bind/data_key normalization, deterministic IDs, payload-algebra reference YAML fixtures, and schema/determinism regression tests.
+- Added CPSV1 semantic validator for bind/channel integrity plus equivalence locks for slot reference fixtures.
+- CPSV1 semantic validation now enforces non-``data`` bind targets to match processor parameters, rejecting typos before runtime.
 - Extended SVA220 to accept DataOperation IO inference from `_process_logic` type annotations; added SVA222 mismatch diagnostic (EIRv1 Phase 0).
 - EIRv1 P1: added MultiChannelDataType and a scalar→channel→scalar float reference pipeline (float_ref_channel_01) with SSOT ledger + regression coverage.
 - EIRv1 P2: added metadata-only slot inference from `_process_logic` annotations and a new stable float reference pipeline (float_ref_slots_01) with ledger drift checks.

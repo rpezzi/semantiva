@@ -1,0 +1,16 @@
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+      data_key: primary
+
+    - processor: FloatValueDataSource
+      parameters:
+        value: 2.0
+      data_key: addend
+
+    - processor: FloatAddTwoInputsOperation
+      bind:
+        data: primary
+        other: addend

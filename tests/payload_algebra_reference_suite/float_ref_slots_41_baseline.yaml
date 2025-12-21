@@ -1,0 +1,6 @@
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+    - processor: FloatAddTwoInputsOperation
