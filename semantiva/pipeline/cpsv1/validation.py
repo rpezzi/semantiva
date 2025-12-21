@@ -57,8 +57,6 @@ def validate_cpsv1_semantics(
 ) -> None:
     """
     Semantic preflight validation for CPSV1 beyond JSON Schema.
-
-    Scope (PA-01F): linear pipelines + channel/bind integrity.
     """
 
     if resolve_processor is not None or registry is not None:

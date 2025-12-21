@@ -26,6 +26,9 @@ import yaml
 
 from semantiva.data_types import BaseDataType, LaneBundleDataType, MultiChannelDataType
 from semantiva.eir.slot_inference import infer_data_slots
+from semantiva.pipeline.cpsv1.canonicalize import canonicalize_yaml_to_cpsv1
+from semantiva.pipeline.cpsv1.derived_edges import derive_edges_v1
+from semantiva.pipeline.cpsv1.identity import compute_pipeline_id_cpsv1
 from semantiva.pipeline.graph_builder import build_canonical_spec, compute_pipeline_id
 from semantiva.registry import load_extensions, resolve_symbol
 from semantiva.registry.descriptors import descriptor_to_json
@@ -145,6 +148,52 @@ def _maybe_load_extensions(pipeline_or_spec: Any) -> None:
     exts = _extract_extensions(doc)
     if exts:
         load_extensions(exts)
+
+
+def _load_authoring_doc(obj: Any) -> Any | None:
+    """Best-effort loader for YAML-ish authoring specs."""
+
+    if isinstance(obj, (dict, list)):
+        return obj
+    if isinstance(obj, str):
+        try:
+            p = Path(obj)
+            if p.exists():
+                return yaml.safe_load(p.read_text(encoding="utf-8"))
+            return yaml.safe_load(obj)
+        except Exception:
+            return None
+    if hasattr(obj, "pipeline_configuration"):
+        try:
+            return list(obj.pipeline_configuration)
+        except Exception:
+            return None
+    return None
+
+
+def _extract_nodes(doc: Any) -> list[dict[str, Any]]:
+    if isinstance(doc, dict) and isinstance(doc.get("pipeline"), dict):
+        nodes = doc["pipeline"].get("nodes") or []
+        return (
+            [n for n in nodes if isinstance(n, dict)] if isinstance(nodes, list) else []
+        )
+    if isinstance(doc, dict):
+        nodes = doc.get("nodes") or []
+        return (
+            [n for n in nodes if isinstance(n, dict)] if isinstance(nodes, list) else []
+        )
+    if isinstance(doc, list):
+        return [n for n in doc if isinstance(n, dict)]
+    return []
+
+
+def _uses_bind_or_data_key(nodes: list[dict[str, Any]]) -> bool:
+    for n in nodes:
+        if "bind" in n and n.get("bind") is not None:
+            return True
+        if "data_key" in n and n.get("data_key") is not None:
+            return True
+    return False
 
 
 def _try_import_dotted(symbol: str) -> Optional[type]:
@@ -488,6 +537,42 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
     eir["source"]["extensions"] = runtime_extensions
     if node_runtime:
         eir["source"]["node_runtime"] = node_runtime
+
+    # Embed CPSV1 + derived edges, and enforce CPSV1-based pipeline_id for bind/data_key specs.
+    _authoring_doc = _load_authoring_doc(pipeline_or_spec)
+    _authoring_nodes = _extract_nodes(_authoring_doc)
+
+    cpsv1 = None
+    if _authoring_doc is not None:
+        try:
+            cpsv1 = canonicalize_yaml_to_cpsv1(_authoring_doc)
+        except Exception:
+            cpsv1 = None
+
+    if _uses_bind_or_data_key(_authoring_nodes):
+        if cpsv1 is None:
+            raise ValueError(
+                "Bind/data_key authoring spec requires CPSV1 canonicalization, but canonicalization failed."
+            )
+        pipeline_id = compute_pipeline_id_cpsv1(cpsv1)
+        eir["identity"]["pipeline_id"] = pipeline_id
+        variant_payload = {
+            "eir_version": 1,
+            "pipeline_id": pipeline_id,
+            "modules": modules,
+        }
+        eir["identity"]["pipeline_variant_id"] = "pvid-" + _sha256_text(
+            _stable_dumps(variant_payload)
+        )
+
+    if cpsv1 is not None:
+        eir["canonical_pipeline_spec"] = cpsv1
+        eir.setdefault("derived", {})
+        eir["derived"] = {
+            "edges": derive_edges_v1(cpsv1),
+            "plan": [],
+            "diagnostics": [],
+        }
 
     eir["identity"]["eir_id"] = compute_eir_id(eir)
     return eir

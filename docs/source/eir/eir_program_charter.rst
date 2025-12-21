@@ -10,11 +10,9 @@ that introduces a single compiled representation for Semantiva execution semanti
 This charter is a drift-resistant SSOT anchor. It documents only what is true on the
 current branch and what is contractually frozen for the series.
 
-SSOT artifacts (Phase 0)
-------------------------
+SSOT artifacts
+--------------
 
-- Technical Design Report: ``TDR_EIRv1.md`` (project artifact; not part of the published docs tree)
-- Work breakdown: ``EIRv1_work_breakdown_PoC.md`` (project artifact; not part of the published docs tree)
 - Series status ledger (this repo): ``docs/source/eir/eir_series_status.yaml``
 - Reference suite (this repo): ``tests/eir_reference_suite/*``
 
@@ -26,8 +24,8 @@ Phase 0 non-goals
 - No CLI changes.
 - No changes to classic execution behavior.
 
-Frozen contracts (Phase 0)
---------------------------
+Frozen contracts
+----------------
 
 The following contracts MUST remain unchanged in Phase 0 epics:
 

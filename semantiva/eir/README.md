@@ -21,7 +21,6 @@ Canonical namespace for the **EIRv1** implementation series.
 See:
 - `docs/source/eir/eir_program_charter.rst`
 - `docs/source/eir/eir_series_status.yaml`
-- `TDR_EIRv1.md` (project artifact)
 
 Note: `docs/source/eir/eir_series_status.yaml` is a historical per-epic snapshot ledger.
 Do not interpret earlier epic checksums as "latest state" for the current branch.

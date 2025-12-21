@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Processor reference resolution contract tests (TDR v2 parity)."""
+"""Processor reference resolution contract tests."""
 
 from __future__ import annotations
 

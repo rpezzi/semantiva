@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [v0.6.0] - Unreleased
 
 ### Added
+- EIRv1: extend schema and compiler to optionally embed CPSV1 meaning (`canonical_pipeline_spec`) and deterministic derived wiring artifacts (`derived.edges`, placeholders for `derived.plan`/`derived.diagnostics`), while preserving scalar pipeline identities; enforce CPSV1-based `pipeline_id` for bind/data_key authoring specs.
 - Added CanonicalPipelineSpecV1 (CPSV1) packaged JSON Schema + strict stable JSON utilities (Phase A foundations; no runtime behavior change).
 - Added deterministic derived-edge utility for CanonicalPipelineSpecV1 along with regression coverage for topology errors.
 - Added EIRv1 series scaffolding (docs SSOT + float reference suite harness) with no runtime behavior changes.

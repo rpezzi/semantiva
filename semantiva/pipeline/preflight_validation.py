@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 class PreflightDiagnostic:
     """CanonicalPipelineSpecV1 pre-flight diagnostic.
 
-    Design intent (TDRv2 §13 / §15.3):
+    Design intent:
       - stable-coded diagnostics (SVA-style)
       - deterministic ordering
       - frontend-tagged (yaml/python) while remaining semantically identical across frontends

@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Frontend parity contract tests (TDR v2)."""
+"""Frontend parity contract tests."""
