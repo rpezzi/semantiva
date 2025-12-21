@@ -25,7 +25,7 @@ from semantiva.context_processors.context_types import ContextType
 def test_rejects_non_scalar_forms() -> None:
     eir = {
         "eir_version": 1,
-        "identity": {"pipeline_id": "x", "pipeline_variant_id": "y", "eir_id": "z"},
+        "identity": {"pipeline_id": "x"},
         "graph": {"graph_version": 1, "nodes": [], "edges": []},
         "parameters": {"objects": {}},
         "plan": {

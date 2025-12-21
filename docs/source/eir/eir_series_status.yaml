@@ -40,17 +40,14 @@ eir_series:
         - tests/eir_compiler/test_compile_eir_determinism.py
         - tests/eir_compiler/test_compile_eir_schema_validation.py
         - tests/eir_compiler/test_compile_eir_ledger_golden_identities.py
-        - tests/eir_compiler/test_eir_id_includes_semantics.py
       notes:
         - "compile_eir_v1 produces classic scalar EIR only"
-        - "eir_id excludes build/source metadata (created_at etc.)"
-        - "eir_id includes semantics+lineage in canonical hash input (empty in C0; populated in C1+)"
+        - "pipeline_id excludes build/source metadata (created_at etc.)"
+        - "Identity surface is pipeline_id only; legacy variant/artifact identity axes removed"
       checksums:
-        eir_schema_v1_sha256: "26466736018b6845f948e8158c389d380cc81ab2d613f741030b624b9619dbf9"
+        eir_schema_v1_sha256: "c0a30ef00157d2d4ec05d7236635914610cfa68e7f0d5936280bfb706d22009e"
         float_ref_01_compiled_identity:
           pipeline_id: "plid-e5aea3f84249459993711efd3860e0957aa0c738585304d7d680f3abccc717f3"
-          pipeline_variant_id: "pvid-736e0a598fa3b86f672a8a8b8a5f4ac5414692764743f4894d8efe74a68793d5"
-          eir_id: "eirid-00f4fa3365479b02935861c1b3e488bfdd411b7ecad5eac5dffab2e63534cfee"
     eir_compiler_poc_forms_and_slots:
       epic: C1
       status: present
@@ -60,34 +57,23 @@ eir_series:
         - tests/eir_compiler/test_compile_eir_reference_suite_schema_validation.py
         - tests/eir_compiler/test_compile_eir_reference_suite_semantics.py
         - tests/eir_compiler/test_compile_eir_ledger_golden_identities.py
-        - tests/eir_compiler/test_eir_id_includes_semantics.py
       notes:
         - "compile_eir_v1 loads YAML extensions (best-effort) to resolve processor symbols"
         - "compile_eir_v1 emits semantics.payload_forms + semantics.slots deterministically"
-        - "eir_id hashes graph/parameters/plan/semantics/lineage and excludes build/source"
+        - "Identity surface is pipeline_id only; legacy variant/artifact identity axes removed"
       checksums:
-        eir_schema_v1_sha256: "3184521ddba89a4eaefbee345017969179c3452d2e386f05bc95871e9222b69b"
+        eir_schema_v1_sha256: "c0a30ef00157d2d4ec05d7236635914610cfa68e7f0d5936280bfb706d22009e"
         compiled_identities:
           float_ref_01:
             pipeline_id: "plid-0a73a3ace43f7cd7702c0c19a32ff8dcf392fa03a1fecb9d3c1b86f735121ccb"
-            pipeline_variant_id: "pvid-bb31791ff0110c1c0c409a77d13d7c143c942b18faf0f6e048c48e10fd2edea5"
-            eir_id: "eirid-6197a888a98f3aeff79e4ec4e36aab52bc8ef4b1afe3d30fcb0713cffa9b2823"
           float_ref_02:
             pipeline_id: "plid-49e23aa7604efef7f00554fdef349e0c5ab06db13b8a96049c7255d174885b61"
-            pipeline_variant_id: "pvid-0f3b558abe16b33971ab82d51657a849813a76bc98fe188bc4b4219cd5cab5f2"
-            eir_id: "eirid-131224c15f86d8dcc2300953e9ee4e040df595e86478a00e9d80c749f2c6459f"
           float_ref_channel_01:
             pipeline_id: "plid-fb115f78ce13fbfbc92707d74e5f269c62c1ea736f725c05294ce929d34f65ec"
-            pipeline_variant_id: "pvid-cdfd9a807569f6e9b5b50d5c2b58fcf0111761b93a5f71a8d58dd624707874ba"
-            eir_id: "eirid-8109934f107dc75b2761feb74b8508c9ecfbdd3f08e475b8c080b2168f0a86e3"
           float_ref_slots_01:
             pipeline_id: "plid-e208eaedfa03ce4dbcc66f0f09b74025126f8fad06f7e9242f9a249af39e5f0b"
-            pipeline_variant_id: "pvid-23ce317eeb5f8bd5ccf97268687346d8086601fb92b3d12798353be66652efe4"
-            eir_id: "eirid-7090cb7cb94a75072efd8020f9e71fc15cfff989f067212cbe63f025a4b2e60d"
           float_ref_lane_01:
             pipeline_id: "plid-9dbf70cc5fa63a870384179b1ad1616d79b30c234f4c96d7841ec809c5688579"
-            pipeline_variant_id: "pvid-59af43432f1c1712c206304f2d2c1bebfddba64b90533a6e35a4f6d3016657de"
-            eir_id: "eirid-b0d3a78eb1f2d60a19bf094b11fb57cf32677e4e8c576f7384647d89885775f2"
   phase_3:
     r0a_eir_scalar_execution_harness:
       epic: R0a
@@ -98,7 +84,7 @@ eir_series:
         - tests/eir_runtime/test_execute_eir_scalar_reference_suite.py
       notes:
         - "Internal-only EIR execution for classic scalar plans (classic_linear), no parity, no switch."
-        - "Runtime-only probe context_key and YAML extensions are carried under eir.source (excluded from eir_id)."
+        - "Runtime-only probe context_key and YAML extensions are carried under eir.source (excluded from pipeline identity)."
     r0a_demo_in_process_example:
       epic: R0a-demo
       status: present

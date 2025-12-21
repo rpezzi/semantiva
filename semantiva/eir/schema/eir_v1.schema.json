@@ -153,11 +153,13 @@
     "identity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pipeline_id", "pipeline_variant_id", "eir_id"],
+      "required": ["pipeline_id"],
       "properties": {
-        "pipeline_id": { "type": "string", "minLength": 1 },
-        "pipeline_variant_id": { "type": "string", "minLength": 1 },
-        "eir_id": { "type": "string", "minLength": 1 }
+        "pipeline_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical pipeline identity (deterministic). For bind/data_key specs, pipeline_id is CPSV1-based."
+        }
       }
     },
 

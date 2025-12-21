@@ -80,7 +80,7 @@ def _fingerprint_source(pipeline_or_spec: Any) -> Tuple[str, str]:
     """
     Return (kind, fingerprint) for the input source.
 
-    Fingerprint is best-effort and NOT used in eir_id hashing (to avoid drift).
+    Fingerprint is best-effort and excluded from canonical pipeline identity hashing (to avoid drift).
     """
     if isinstance(pipeline_or_spec, str):
         p = Path(pipeline_or_spec)
@@ -347,35 +347,6 @@ def _form_for_datatype(t: Optional[type]) -> str:
     return "scalar"
 
 
-def _canonicalize_for_eir_id(eir_doc: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Canonical subset used for deterministic identity.
-
-    MUST include structural meaning (graph/parameters/plan/semantics/lineage).
-    MUST exclude ephemeral build/source metadata.
-    MUST exclude identity.eir_id itself.
-    """
-
-    ident = eir_doc.get("identity", {}) or {}
-    return {
-        "eir_version": eir_doc.get("eir_version", 1),
-        "identity": {
-            "pipeline_id": ident.get("pipeline_id", ""),
-            "pipeline_variant_id": ident.get("pipeline_variant_id", ""),
-        },
-        "graph": eir_doc.get("graph", {}),
-        "parameters": eir_doc.get("parameters", {}),
-        "plan": eir_doc.get("plan", {}),
-        "semantics": eir_doc.get("semantics", {}),
-        "lineage": eir_doc.get("lineage", {}),
-    }
-
-
-def compute_eir_id(eir_doc: Dict[str, Any]) -> str:
-    canonical = _canonicalize_for_eir_id(eir_doc)
-    return "eirid-" + _sha256_text(_stable_dumps(canonical))
-
-
 @dataclass(frozen=True)
 class CompileResult:
     eir: Dict[str, Any]
@@ -396,8 +367,6 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
 
     canonical_graph, resolved_nodes = build_canonical_spec(pipeline_or_spec)
     pipeline_id = compute_pipeline_id(canonical_graph)
-
-    observed_modules: set[str] = {"classic_scalar", "compile_semantics_v1"}
 
     node_io: Dict[str, Dict[str, Any]] = {}
     node_slots: Dict[str, Dict[str, Any]] = {}
@@ -422,13 +391,6 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
 
         input_form = _form_for_datatype(in_t)
         output_form = _form_for_datatype(out_t)
-
-        if input_form == "channel" or output_form == "channel":
-            observed_modules.add("payload_channel")
-        if input_form == "lane_bundle" or output_form == "lane_bundle":
-            observed_modules.add("payload_lane_bundle")
-        if inferred_slots.get("inputs") or inferred_slots.get("output") is not None:
-            observed_modules.add("slot_inference_v1")
 
         node_io[node_uuid] = {
             "processor_ref": proc_ref,
@@ -466,10 +428,6 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
         "edges": canonical_graph.get("edges", []),
     }
 
-    modules = sorted(observed_modules)
-    variant_payload = {"eir_version": 1, "pipeline_id": pipeline_id, "modules": modules}
-    pipeline_variant_id = "pvid-" + _sha256_text(_stable_dumps(variant_payload))
-
     root_form = "scalar"
     terminal_form = "scalar"
     if node_order:
@@ -502,11 +460,7 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
         "source": {"kind": source_kind, "pipeline_spec_fingerprint": source_fp},
-        "identity": {
-            "pipeline_id": pipeline_id,
-            "pipeline_variant_id": pipeline_variant_id,
-            "eir_id": "",
-        },
+        "identity": {"pipeline_id": pipeline_id},
         "graph": graph,
         "parameters": {"objects": param_objects},
         "plan": plan,
@@ -556,14 +510,6 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
             )
         pipeline_id = compute_pipeline_id_cpsv1(cpsv1)
         eir["identity"]["pipeline_id"] = pipeline_id
-        variant_payload = {
-            "eir_version": 1,
-            "pipeline_id": pipeline_id,
-            "modules": modules,
-        }
-        eir["identity"]["pipeline_variant_id"] = "pvid-" + _sha256_text(
-            _stable_dumps(variant_payload)
-        )
 
     if cpsv1 is not None:
         eir["canonical_pipeline_spec"] = cpsv1
@@ -573,6 +519,4 @@ def compile_eir_v1(pipeline_or_spec: Any) -> Dict[str, Any]:
             "plan": [],
             "diagnostics": [],
         }
-
-    eir["identity"]["eir_id"] = compute_eir_id(eir)
     return eir

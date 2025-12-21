@@ -41,7 +41,7 @@ def normalize_eir_doc(eir: dict[str, Any]) -> dict[str, Any]:
 
     FP0c rule:
       - Exclude frontend/build provenance (eir.source.*, build timestamps/version strings).
-      - Preserve semantic meaning: identity (including eir_id), graph, parameters, plan, semantics, lineage.
+      - Preserve semantic meaning: identity, graph, parameters, plan, semantics, lineage.
     """
     copied = json.loads(json.dumps(eir, sort_keys=True))
     return _strip_provenance(copied)

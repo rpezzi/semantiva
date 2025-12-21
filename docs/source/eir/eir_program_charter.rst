@@ -48,6 +48,29 @@ Rules:
 3) If a future epic needs additional reference pipelines, it must add them
    **without rewriting** the meaning of existing references.
 
+Identity crosswalk
+------------------
+
+CPSV1
+~~~~~
+* Canonical pipeline identity is ``pipeline_id`` computed from CPSV1 stable JSON.
+* Derived artifacts do not influence identity hashing.
+
+Legacy GraphV1 (transitional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Legacy scalar pipelines retain the existing ``pipeline_id`` behavior until migrated.
+
+EIRv1 schema identity block
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Required: ``pipeline_id``.
+* No other identity axes exist
+
+Trace / SER
+~~~~~~~~~~~
+* Runtime identity: ``run_id``.
+* Pipeline identity for keying: ``pipeline_id``.
+* SER per-record identity additionally includes ``node_id``.
+
 PoC execution strategy (future epics)
 -------------------------------------
 
@@ -92,15 +115,12 @@ Phase 2 facts (as landed)
 - EIRv1 schema skeleton exists: ``semantiva/eir/schema/eir_v1.schema.json``.
 - Classic pipelines can be compiled to an EIRv1 document via ``semantiva.eir.compile_eir_v1``.
 - The compiled EIR is schema-validated in CI.
-- ``eir_id`` is deterministic across compiles and is computed from a canonical subset that:
-  - includes: ``graph``, ``parameters``, ``plan``, ``semantics``, ``lineage``
-  - excludes: ephemeral ``build``/``source`` metadata (timestamps, environment drift)
+- Canonical pipeline identity is ``pipeline_id`` derived deterministically from the canonical pipeline spec; build/source metadata
+  (timestamps, environment drift) are excluded from identity hashing.
 - No runtime execution semantics changed; pipeline execution remains **Payload -> Payload**.
 - Phase 2 C1 extends compilation to emit deterministic compiled facts in ``semantics``:
   - payload form propagation per node (scalar/channel/lane_bundle)
   - metadata-only inferred slot candidates per node from ``_process_logic`` annotations
-- ``eir_id`` is computed from a canonical subset that includes ``graph``, ``parameters``, ``plan``, ``semantics``, and ``lineage``,
-  while excluding ephemeral ``build``/``source`` metadata (timestamps, environment drift).
 
 Ledger semantics (historical snapshots)
 ---------------------------------------

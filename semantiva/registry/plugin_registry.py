@@ -83,6 +83,17 @@ ENTRYPOINT_GROUP = "semantiva.extensions"
 logger = Logger()
 _LOADED_EXTENSIONS: set[str] = set()
 
+# Built-in alias mapping for source-tree execution.
+#
+# In an installed distribution, entry points provide the mapping between
+# extension names and importable modules. When running directly from a source
+# tree (e.g., tests invoking the CLI via `python -m semantiva.semantiva`),
+# those entry points may not exist. This mapping makes a small set of in-tree
+# extensions loadable by their canonical extension name.
+_BUILTIN_EXTENSION_MODULE_ALIASES: Dict[str, str] = {
+    "semantiva-examples": "semantiva.examples.extension",
+}
+
 
 def _register_from_module(mod: ModuleType) -> bool:
     """Discover and register an extension within an imported module.
@@ -170,22 +181,43 @@ def load_extensions(specs_to_load: Iterable[str] | str | None) -> None:
             logger.debug("Extension '%s' already loaded; skipping", ref)
             resolved.add(ref)
             continue
-        try:
-            module = importlib.import_module(ref)
-        except Exception as exc:
-            module_notes.setdefault(ref, f"import error: {exc}")
-            continue
-        try:
-            if _register_from_module(module):
-                logger.debug("Registered extension via module import: %s", ref)
-                _LOADED_EXTENSIONS.add(ref)
-                resolved.add(ref)
+
+        candidates: List[str] = [ref]
+        alias = _BUILTIN_EXTENSION_MODULE_ALIASES.get(ref)
+        if alias and alias not in candidates:
+            candidates.insert(0, alias)
+
+        registered = False
+        notes: List[str] = []
+        for candidate in candidates:
+            try:
+                module = importlib.import_module(candidate)
+            except Exception as exc:
+                notes.append(f"{candidate}: import error: {exc}")
                 continue
-        except Exception as exc:  # pragma: no cover - extension bugs
-            raise RuntimeError(
-                f"Extension '{ref}' raised an error during register(): {exc}"
-            ) from exc
-        module_notes.setdefault(ref, "no register() hook found")
+
+            try:
+                if _register_from_module(module):
+                    logger.debug(
+                        "Registered extension via module import: %s (module=%s)",
+                        ref,
+                        candidate,
+                    )
+                    _LOADED_EXTENSIONS.add(ref)
+                    resolved.add(ref)
+                    registered = True
+                    break
+            except Exception as exc:  # pragma: no cover - extension bugs
+                raise RuntimeError(
+                    f"Extension '{ref}' raised an error during register(): {exc}"
+                ) from exc
+
+            notes.append(f"{candidate}: no register() hook found")
+
+        if registered:
+            continue
+
+        module_notes.setdefault(ref, "; ".join(notes) if notes else "not found")
 
     remaining = [name for name in ordered if name not in resolved]
     if not remaining:
@@ -242,6 +274,8 @@ def load_extensions(specs_to_load: Iterable[str] | str | None) -> None:
             + ", ".join(details)
             + f". Ensure they expose entry point group '{ENTRYPOINT_GROUP}' or a module-level register()."
         )
+
+    return
 
 
 class SemantivaExtension(ABC):

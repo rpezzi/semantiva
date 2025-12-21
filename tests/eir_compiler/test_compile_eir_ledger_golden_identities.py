@@ -45,5 +45,3 @@ def test_compiled_identities_match_ledger() -> None:
         ident = eir["identity"]
         want = exp[ref.stem]
         assert ident["pipeline_id"] == want["pipeline_id"]
-        assert ident["pipeline_variant_id"] == want["pipeline_variant_id"]
-        assert ident["eir_id"] == want["eir_id"]

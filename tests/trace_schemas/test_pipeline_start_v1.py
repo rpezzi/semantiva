@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 try:  # pragma: no cover - optional dependency
@@ -65,3 +67,20 @@ def test_pipeline_start_wrong_record_type_fails() -> None:
     HEADER.validate(bad)
     with pytest.raises(jsonschema.ValidationError):
         START.validate(bad)
+
+
+def _forbidden_identity_tokens() -> tuple[str, str]:
+    """Return identity tokens that must not appear in trace schemas."""
+    variant_token = "pipeline" + "_variant" + "_id"
+    artifact_token = "eir" + "_id"
+    return variant_token, artifact_token
+
+
+def test_pipeline_start_schema_surface_excludes_prohibited_identity_fields() -> None:
+    schema_str = Path(
+        "semantiva/trace/schema/pipeline_start_event_v1.schema.json"
+    ).read_text(encoding="utf-8")
+
+    variant_token, artifact_token = _forbidden_identity_tokens()
+    assert variant_token not in schema_str
+    assert artifact_token not in schema_str

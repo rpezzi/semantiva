@@ -13,9 +13,34 @@ Semantiva contains shipped schema and compiler support carrying a CPSV1 meaning 
   * ``derived.plan`` — placeholder array for future payload algebra scheduling.
   * ``derived.diagnostics`` — placeholder array for compiler diagnostics.
 
-Identity rule:
-* For authoring specs that use ``bind`` and/or ``data_key``, ``eir.identity.pipeline_id`` MUST be computed from the embedded CPSV1 only.
-* For legacy pipelines that do not use ``bind``/``data_key``, identity behavior remains unchanged in attaching these optional fields (pipeline_id preservation until PA-03).
+Identity Contract
+-----------------
+
+Canonical pipeline identity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The canonical identity for “what pipeline this is” is **only**:
+
+* ``pipeline_id`` — deterministic compile-time identity.
+
+For authoring specs that use payload-algebra features (e.g., ``bind`` / ``data_key``),
+the compiler embeds a CPSV1 meaning layer and MUST set ``pipeline_id`` equal to the
+CPSV1 identity (computed from CPSV1 stable JSON). Derived artifacts MUST NOT influence
+canonical identity hashing.
+
+Prohibited identity fields
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+All non-canonical identity axes have been removed from the EIR surface:
+
+* Variant and artifact identity fields are not present in the schema or compiler output.
+* Tests and docs treat ``pipeline_id`` as the only canonical identifier.
+
+Hashing exclusions (normative)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The following MUST NOT influence canonical identity hashing:
+
+* any ``derived.*`` compiler artifacts,
+* diagnostics and timestamps,
+* build/source provenance fields.
 
 .. literalinclude:: ../../../semantiva/eir/schema/eir_v1.schema.json
    :language: json

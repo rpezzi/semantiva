@@ -51,9 +51,9 @@ def _assert_eir_semantics_parity(ref_id: str) -> None:
     assert canonical_bytes(norm_yaml) == canonical_bytes(norm_py)
 
     # Convenience: ensure identity is aligned (implicitly enforced by byte equality).
-    assert norm_yaml.get("identity", {}).get("eir_id") == norm_py.get(
+    assert norm_yaml.get("identity", {}).get("pipeline_id") == norm_py.get(
         "identity", {}
-    ).get("eir_id")
+    ).get("pipeline_id")
 
 
 def test_eir_semantics_parity_float_ref_01() -> None:

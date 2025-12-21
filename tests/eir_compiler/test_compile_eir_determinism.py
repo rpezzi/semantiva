@@ -31,8 +31,5 @@ def test_compile_eir_v1_is_deterministic_and_matches_pipeline_id() -> None:
     canonical = build_graph(str(REF))
     assert e1["identity"]["pipeline_id"] == compute_pipeline_id(canonical)
 
-    # eir_id must be stable across compiles (created_at changes must not matter)
-    assert e1["identity"]["eir_id"] == e2["identity"]["eir_id"]
-    assert (
-        e1["identity"]["pipeline_variant_id"] == e2["identity"]["pipeline_variant_id"]
-    )
+    # canonical pipeline identity must be stable across compiles (created_at changes must not matter)
+    assert e1["identity"] == e2["identity"]

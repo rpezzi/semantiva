@@ -68,6 +68,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   example while keeping showcased examples runnable from `docs/examples/`.
 - Enable code copy buttons in code blocks across the docs.
 
+### Changed
+- PA-02I: locked EIR identity to ``pipeline_id`` only and removed legacy variant/artifact identity fields from schema, compiler output, docs, and tests.
+
 
 ## [v0.5.0] - 2025-11-15
 
