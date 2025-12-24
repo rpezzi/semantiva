@@ -12,6 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""EIR runtime execution helpers for scalar and payload algebra backends.
+
+This module provides compilation and execution utilities for classic_linear pipelines
+under EIRv1. It supports:
+- Scalar backend: classic_linear scalar->scalar execution
+- Payload algebra backend: channel store + bind/publish semantics (PA-03C)
+
+The runtime helpers extract execution-ready node specifications from compiled EIR
+documents and orchestrate them via the appropriate backend execution harness.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -58,6 +69,7 @@ def _extract_linear_scalar_segment(
 def _resolved_nodes_from_eir(
     eir: Dict[str, Any],
 ) -> Tuple[dict[str, Any], List[dict[str, Any]]]:
+    """Extract resolved node definitions from compiled EIR document."""
     node_order, _ = _extract_linear_scalar_segment(eir)
 
     graph = eir.get("graph") or {}
@@ -65,9 +77,11 @@ def _resolved_nodes_from_eir(
     edges = graph.get("edges") or []
 
     node_by_uuid: dict[str, dict[str, Any]] = {}
+    declaration_index_by_uuid: dict[str, int | None] = {}
     for node in nodes:
         if isinstance(node, dict) and isinstance(node.get("node_uuid"), str):
             node_by_uuid[node["node_uuid"]] = node
+            declaration_index_by_uuid[node["node_uuid"]] = node.get("declaration_index")
 
     params_obj = (eir.get("parameters") or {}).get("objects") or {}
     runtime = (
@@ -75,6 +89,10 @@ def _resolved_nodes_from_eir(
         if isinstance(eir.get("source"), dict)
         else None
     )
+    cps_nodes = (eir.get("canonical_pipeline_spec") or {}).get("nodes") or []
+    cps_by_decl_index = {
+        n.get("declaration_index"): n for n in cps_nodes if isinstance(n, dict)
+    }
 
     resolved: list[dict[str, Any]] = []
     for node_uuid in node_order:
@@ -82,9 +100,14 @@ def _resolved_nodes_from_eir(
         if not spec:
             raise EIRExecutionError(f"Node {node_uuid} not found in eir.graph.nodes")
 
+        decl_index = declaration_index_by_uuid.get(node_uuid)
+        cps_node = cps_by_decl_index.get(decl_index, {})
         node_def: dict[str, Any] = {
             "processor": spec.get("processor_ref"),
             "parameters": params_obj.get(f"params:{node_uuid}", {}) or {},
+            "bind": cps_node.get("bind") or spec.get("bind") or {},
+            "publish": cps_node.get("publish") or spec.get("publish") or {},
+            "node_uuid": node_uuid,
         }
 
         runtime_row = runtime.get(node_uuid) if isinstance(runtime, dict) else None

@@ -20,11 +20,33 @@ for both runtime execution and inspection classification across all processors.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple, List, Set
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Dict, Mapping, Optional, Tuple, List, Set
 import inspect
 
 from semantiva.data_processors.data_processors import ParameterInfo, _NO_DEFAULT
 from semantiva.context_processors.context_types import ContextType
+
+
+_PARAM_OVERLAY: ContextVar[Mapping[str, Any] | None] = ContextVar(
+    "_PARAM_OVERLAY", default=None
+)
+
+
+@contextmanager
+def param_resolution_overlay(overlay: Mapping[str, Any] | None):
+    """Context manager providing temporary parameter overlay for resolution.
+
+    Parameters resolved via resolve_runtime_value will check the overlay first,
+    then fall back to config, context, and defaults. The overlay does not mutate
+    processor_config and is automatically cleaned up when the context exits.
+    """
+    token = _PARAM_OVERLAY.set(overlay)
+    try:
+        yield
+    finally:
+        _PARAM_OVERLAY.reset(token)
 
 
 _RESERVED_NAMES: Set[str] = {"context"}
@@ -154,7 +176,10 @@ def resolve_runtime_value(
     processor_config: Dict[str, Any],
     context: ContextType,
 ) -> Any:
-    """Single source of truth for runtime resolution: config > context > default."""
+    """Single source of truth for runtime resolution: overlay > config > context > default."""
+    overlay = _PARAM_OVERLAY.get()
+    if overlay is not None and name in overlay:
+        return overlay[name]
     if name in processor_config:
         return processor_config[name]
     if name in context.keys():

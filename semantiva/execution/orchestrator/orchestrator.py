@@ -31,6 +31,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Mapping,
     Optional,
     Sequence,
     TypeVar,
@@ -38,6 +39,8 @@ from typing import (
 )
 
 from semantiva.data_processors.data_processors import ParameterInfo, _NO_DEFAULT
+from semantiva.data_types import NoDataType
+from semantiva.eir.payload_algebra_contracts import MISSING
 from semantiva.execution.executor.executor import (
     SemantivaExecutor,
     SequentialSemantivaExecutor,
@@ -188,6 +191,22 @@ class SemantivaOrchestrator(ABC):
         if canonical is None or resolved_spec is None:
             raise RuntimeError("Failed to resolve pipeline specification for execution")
 
+        payload_algebra_backend = execution_backend == "eir_payload_algebra"
+        channels = None
+        canonical_nodes_by_uuid: dict[str, dict[str, Any]] = {}
+        if payload_algebra_backend:
+            from semantiva.eir.execution_payload_algebra import (
+                InMemoryChannelStore,
+            )
+
+            channels = InMemoryChannelStore()
+            channels.seed_primary(data)
+            canonical_nodes_by_uuid = {
+                str(n.get("node_uuid")): n
+                for n in canonical.get("nodes", [])
+                if isinstance(n, dict) and n.get("node_uuid")
+            }
+
         run_id: str | None = None
         pipeline_id: str | None = None
         node_uuids: list[str] = []
@@ -298,13 +317,101 @@ class SemantivaOrchestrator(ABC):
                 node_def = node_defs[index]
                 node_id = node_uuids[index] if index < len(node_uuids) else ""
                 pre_ctx_view = self._context_snapshot(context)
-                required_keys = self._required_keys_for(node, node_def)
-                params, param_sources = self._resolve_params_with_sources(
-                    node, node_def, pre_ctx_view, required_keys
-                )
+
+                params: dict[str, Any]
+                param_sources: dict[str, str]
+                required_keys: list[str]
+                publish_plan = None
+                runtime_config: dict[str, Any] | None = None
+                input_data = data
+
+                if payload_algebra_backend:
+                    from semantiva.eir.execution_payload_algebra import (
+                        PayloadAlgebraResolutionError,
+                        PublishPlanV1,
+                        resolve_param_value,
+                    )
+
+                    # Type assertion: channels is InMemoryChannelStore in payload_algebra mode
+                    assert (
+                        channels is not None
+                    ), "channels required for payload_algebra_backend"
+
+                    node_spec = dict(canonical_nodes_by_uuid.get(node_id, {}))
+                    node_spec.update(node_def or {})
+                    binds = node_spec.get("bind") or {}
+                    publish_plan = PublishPlanV1.from_cpsv1(node_spec)
+
+                    node_params_cfg = self._processor_config_for(node, node_def)
+                    defaults_map = self._parameter_defaults(node.processor)
+                    param_names: list[str] = list(
+                        getattr(
+                            node.processor, "get_processing_parameter_names", lambda: []
+                        )()
+                    )
+                    resolved_params: dict[str, Any] = {}
+                    param_sources = {}
+                    for name in param_names:
+                        default_value = self._payload_algebra_default(
+                            defaults_map, name
+                        )
+                        val, src = resolve_param_value(
+                            name,
+                            binds=binds,
+                            node_params=node_params_cfg,
+                            context=pre_ctx_view,
+                            channels=channels,
+                            default=default_value,
+                        )
+                        resolved_params[name] = val
+                        param_sources[name] = src
+
+                    input_data, _ = resolve_param_value(
+                        "data",
+                        binds=binds,
+                        node_params=node_params_cfg,
+                        context=pre_ctx_view,
+                        channels=channels,
+                        default=MISSING,
+                    )
+                    # DO NOT write param_sources["data"] - keep it out of SER for PA-03C schema compatibility
+
+                    expected_input_type = getattr(
+                        node.processor, "input_data_type", lambda: None
+                    )()
+                    if (
+                        isinstance(expected_input_type, type)
+                        and expected_input_type is NoDataType
+                        and not isinstance(input_data, NoDataType)
+                    ):
+                        input_data = NoDataType()
+
+                    # Schema-safe view for SER emission (PA-03C): omit bind-sourced keys entirely
+                    _ALLOWED_SOURCES = {"context", "node", "default"}
+                    ser_param_sources = {
+                        k: v for k, v in param_sources.items() if v in _ALLOWED_SOURCES
+                    }
+
+                    runtime_config = dict(node_params_cfg)
+                    runtime_config.update(resolved_params)
+                    required_keys = self._required_keys_for(
+                        node, {"parameters": runtime_config}
+                    )
+                    params = {
+                        k: serialize_json_safe(v) for k, v in resolved_params.items()
+                    }
+                else:
+                    required_keys = self._required_keys_for(node, node_def)
+                    params, param_sources = self._resolve_params_with_sources(
+                        node, node_def, pre_ctx_view, required_keys
+                    )
+                    ser_param_sources = param_sources
+
                 pre_checks = self._build_pre_checks(
-                    node, pre_ctx_view, data, required_keys
-                ) + self._extra_pre_checks(node, pre_ctx_view, data, required_keys)
+                    node, pre_ctx_view, input_data, required_keys
+                ) + self._extra_pre_checks(
+                    node, pre_ctx_view, input_data, required_keys
+                )
 
                 collector = DeltaCollector(
                     enable_hash=bool(trace_opts.get("hash")),
@@ -333,17 +440,43 @@ class SemantivaOrchestrator(ABC):
                 summaries: dict[str, dict[str, object]] = {}
                 if trace_driver is not None:
                     start_wall, start_cpu, start_iso = self._start_timing()
-                    summaries = self._init_summaries(data, pre_ctx_view, trace_opts)
+                    summaries = self._init_summaries(
+                        input_data, pre_ctx_view, trace_opts
+                    )
 
+                # Use overlay for payload_algebra_backend instead of mutating processor_config
                 def node_callable() -> Payload:
-                    return node.process(Payload(data, context))
+                    if payload_algebra_backend and resolved_params:
+                        from semantiva.pipeline._param_resolution import (
+                            param_resolution_overlay,
+                        )
+
+                        with param_resolution_overlay(resolved_params):
+                            return node.process(Payload(input_data, context))
+                    else:
+                        return node.process(Payload(input_data, context))
 
                 try:
                     result = self._submit_and_wait(node_callable, ser_hooks=hooks)
                     if not isinstance(result, Payload):
                         raise TypeError("Node execution must return a Payload instance")
                     payload = result
-                    data, context = payload.data, payload.context
+                    output_data = (
+                        result.data
+                    )  # Capture node output for transport publish
+                    exec_context = payload.context
+                    if payload_algebra_backend and publish_plan is not None:
+                        # Type assertion: channels guaranteed non-None in payload_algebra mode
+                        assert channels is not None
+                        publish_plan.apply(result.data, channels)
+                        data = channels.get("primary")
+                        if data is MISSING:
+                            raise PayloadAlgebraResolutionError(
+                                "Primary channel missing after publish; ensure a source populated it."
+                            )
+                        context = exec_context
+                    else:
+                        data, context = payload.data, exec_context
                     post_ctx_view = self._context_snapshot(context)
                     context_delta = self._ensure_context_delta(
                         hooks.context_delta_provider()
@@ -384,7 +517,7 @@ class SemantivaOrchestrator(ABC):
                                 "cpu_ms": cpu_ms,
                             },
                             params=params,
-                            param_sources=param_sources,
+                            param_sources=ser_param_sources,
                             summaries=summaries,
                             error=None,
                         )
@@ -440,7 +573,7 @@ class SemantivaOrchestrator(ABC):
                                 "cpu_ms": cpu_ms,
                             },
                             params=params,
-                            param_sources=param_sources,
+                            param_sources=ser_param_sources,
                             summaries=summaries,
                             error={
                                 "type": type(exc).__name__,
@@ -450,7 +583,7 @@ class SemantivaOrchestrator(ABC):
                         trace_driver.on_node_event(ser)
                     raise
 
-                self._publish(node, data, context, transport)
+                self._publish(node, output_data, context, transport)
 
             if trace_driver is not None:
                 trace_driver.on_pipeline_end(run_token, {"status": "ok"})
@@ -534,6 +667,17 @@ class SemantivaOrchestrator(ABC):
                 metadata = {}
         params = metadata.get("parameters", {}) if isinstance(metadata, dict) else {}
         return params if isinstance(params, dict) else {}
+
+    def _payload_algebra_default(
+        self, defaults_map: Mapping[str, Any], name: str
+    ) -> Any:
+        info = defaults_map.get(name)
+        if isinstance(info, ParameterInfo):
+            return info.default if info.default is not _NO_DEFAULT else MISSING
+        if isinstance(info, dict):
+            candidate = info.get("default", _NO_DEFAULT)
+            return candidate if candidate is not _NO_DEFAULT else MISSING
+        return MISSING
 
     def _infer_context_parameters(
         self, node: _PipelineNode, node_def: dict[str, Any] | None
