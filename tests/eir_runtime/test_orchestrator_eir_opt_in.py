@@ -112,3 +112,24 @@ def test_orchestrator_opt_in_eir_scalar_accepts_python_list_spec() -> None:
     )
 
     assert out.data.data == 3.0
+
+
+def test_execution_payload_algebra_module_importable() -> None:
+    import semantiva.eir.execution_payload_algebra as _  # noqa: F401
+
+
+def test_orchestrator_opt_in_eir_payload_algebra_float_ref_01() -> None:
+    orch = LocalSemantivaOrchestrator()
+    spec = str(_repo_root() / "tests" / "eir_reference_suite" / "float_ref_01.yaml")
+    payload = Payload(NoDataType(), ContextType({"value": 1.0, "addend": 2.0}))
+
+    out = orch.execute(
+        pipeline_spec=spec,
+        payload=payload,
+        transport=InMemorySemantivaTransport(),
+        logger=Logger(),
+        execution_backend="eir_payload_algebra",
+    )
+
+    assert out.data.data == 3.0
+    assert out.context.get_value("result") == 3.0

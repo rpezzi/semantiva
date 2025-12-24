@@ -114,6 +114,21 @@ def build_scalar_specs_from_pipeline_spec(
     return _resolved_nodes_from_eir(eir)
 
 
+def build_payload_algebra_specs_from_pipeline_spec(
+    pipeline_or_spec: Any,
+) -> Tuple[dict[str, Any], List[dict[str, Any]]]:
+    """
+    PA-03B routing seam for execution_backend="eir_payload_algebra".
+
+    PA-03B is plumbing-only: this aliases the existing scalar compilation/resolution.
+    Payload algebra semantics (channel store + bind/emit) are implemented in PA-03C.
+
+    Note: intentionally not exported as a public API commitment in PA-03B.
+    """
+
+    return build_scalar_specs_from_pipeline_spec(pipeline_or_spec)
+
+
 def build_scalar_specs_from_yaml(
     pipeline_yaml_path: str,
 ) -> Tuple[dict[str, Any], List[dict[str, Any]]]:

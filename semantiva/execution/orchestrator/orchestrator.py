@@ -116,7 +116,9 @@ class SemantivaOrchestrator(ABC):
         canonical_spec: dict[str, Any] | None = None,
         run_metadata: dict[str, Any] | None = None,
         *,
-        execution_backend: Literal["legacy", "eir_scalar"] = "legacy",
+        execution_backend: Literal[
+            "legacy", "eir_scalar", "eir_payload_algebra"
+        ] = "legacy",
     ) -> Payload:
         """Run the pipeline and emit SER records via the template method.
 
@@ -162,6 +164,22 @@ class SemantivaOrchestrator(ABC):
                 )
 
             canonical, resolved_spec = build_scalar_specs_from_pipeline_spec(
+                pipeline_spec
+            )
+        elif execution_backend == "eir_payload_algebra":
+            from semantiva.eir.runtime import (
+                build_payload_algebra_specs_from_pipeline_spec,
+            )
+
+            if not isinstance(pipeline_spec, (str, list, tuple)) and not hasattr(
+                pipeline_spec, "pipeline_configuration"
+            ):
+                raise TypeError(
+                    "eir_payload_algebra execution backend requires pipeline_spec to be a YAML path "
+                    "string or a Python list/tuple of node dicts (or a Pipeline-like object)."
+                )
+
+            canonical, resolved_spec = build_payload_algebra_specs_from_pipeline_spec(
                 pipeline_spec
             )
         else:
