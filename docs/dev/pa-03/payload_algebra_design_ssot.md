@@ -60,7 +60,8 @@ These are declarative rules, not code.
   - `data_key` → publish.out
   - do not clobber primary unless publishing to primary
 - Provenance mapping rules for SER:
-  - parameter_sources: bind | context | node | default  (schema upgrade deferred to PA-03D)
+  - `parameter_sources`: context | data | node | default
+  - `parameter_source_refs`: per-parameter structured refs for `context` and `data` parameters to disambiguate key/channel and producer identity. `bind` is configuration-only.
 
 ### 3) Existing Semantiva integration points (explicitly name)
 - TraceDriver + JsonlTraceDriver lifecycle ordering is preserved.
