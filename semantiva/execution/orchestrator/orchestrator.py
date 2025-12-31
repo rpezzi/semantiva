@@ -199,7 +199,7 @@ class SemantivaOrchestrator(ABC):
             return False
 
         passthrough_checker: Callable[[object], bool] = _default_passthrough_checker
-        producer_ref_type: object | None = None
+        producer_ref_cls: type[object] | None = None
 
         channels = None
         canonical_nodes_by_uuid: dict[str, dict[str, Any]] = {}
@@ -208,18 +208,16 @@ class SemantivaOrchestrator(ABC):
             from semantiva.eir.execution_payload_algebra import (
                 InMemoryChannelStore,
                 ContextProducerStore,
+                ProducerRef,
                 _is_passthrough_node,
             )
-            from semantiva.eir.payload_algebra_contracts import (
-                ProducerRef,
-                parse_source_ref,
-            )
+            from semantiva.eir.payload_algebra_contracts import parse_source_ref
 
             channels = InMemoryChannelStore()
             channels.seed_primary(data)
 
             passthrough_checker = cast(Callable[[object], bool], _is_passthrough_node)
-            producer_ref_type = ProducerRef
+            producer_ref_cls = ProducerRef
 
             # PA-03D: per-key context producer tracking (last-writer)
             initial_ctx_keys = set()
@@ -549,18 +547,37 @@ class SemantivaOrchestrator(ABC):
                         # Type assertion: channels guaranteed non-None in payload_algebra mode
                         assert channels is not None
                         assert context_producer_store is not None
-                        assert producer_ref_type is not None
+                        assert producer_ref_cls is not None
                         is_passthrough = passthrough_checker(node)
-                        node_producer = cast(Any, producer_ref_type)(
+                        node_producer = cast(Any, producer_ref_cls)(
                             kind="node", node_uuid=node_id, output_slot="out"
                         )
-                        publish_plan.apply(
-                            result.data,
-                            channels,
-                            producer=node_producer,
-                            is_passthrough=is_passthrough,
-                            input_channel=input_channel,
-                        )
+                        publish_plan.apply(result.data, channels)
+                        out_ch = getattr(publish_plan, "out_channel", "primary")
+                        if is_passthrough and out_ch == input_channel:
+                            in_entry = channels.get_entry(input_channel)
+                            if in_entry is not None:
+                                channels.set_entry(
+                                    out_ch,
+                                    value=result.data,
+                                    producer=in_entry.producer,
+                                    carry_forward_from=input_channel,
+                                )
+                            else:
+                                channels.set_entry(
+                                    out_ch,
+                                    value=result.data,
+                                    producer=cast(Any, producer_ref_cls)(
+                                        kind="pipeline_input_data"
+                                    ),
+                                    carry_forward_from=input_channel,
+                                )
+                        else:
+                            channels.set_entry(
+                                out_ch,
+                                value=result.data,
+                                producer=node_producer,
+                            )
                         data = channels.get("primary")
                         if data is MISSING:
                             raise PayloadAlgebraResolutionError(

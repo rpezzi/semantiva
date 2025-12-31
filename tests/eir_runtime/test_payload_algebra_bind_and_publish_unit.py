@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from semantiva.eir.payload_algebra_contracts import ProducerRef, parse_source_ref
+from semantiva.eir.execution_payload_algebra import ProducerRef
+from semantiva.eir.payload_algebra_contracts import parse_source_ref
 
 
 def test_parse_source_ref_defaults_to_channel() -> None:
@@ -46,9 +47,9 @@ def test_bind_precedence_and_ambiguity_rules() -> None:
 
     channels = InMemoryChannelStore()
     channels.seed_primary("P")
-    channels.set(
+    channels.set_entry(
         "addend",
-        "A",
+        value="A",
         producer=ProducerRef(kind="node", node_uuid="source-1", output_slot="out"),
     )
 
@@ -121,6 +122,10 @@ def test_publish_semantics_non_primary_does_not_clobber_primary() -> None:
     plan.apply(
         "OUT",
         channels,
+    )
+    channels.set_entry(
+        "addend",
+        value="OUT",
         producer=ProducerRef(kind="node", node_uuid="node-out", output_slot="out"),
     )
 

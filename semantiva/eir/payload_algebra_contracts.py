@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Mapping, Protocol
+from typing import Any, Callable, Literal, Mapping, Protocol, Tuple
 
 from semantiva.pipeline.payload import Payload
 
-# PA-03A: contracts only. Must not be wired into runtime execution paths in this epic.
+# PA-03A: contracts only. This module must not be wired into runtime execution paths.
 
 SourceKind = Literal["channel", "context"]
 ParameterSource = Literal["context", "data", "node", "default"]
-ProducerKind = Literal["pipeline_input_context", "pipeline_input_data", "node"]
 
 TraceHook = Callable[[str, Mapping[str, Any]], None]
 
@@ -25,41 +24,6 @@ MISSING: Any = object()
 class SourceRef:
     kind: SourceKind
     key: str
-
-
-@dataclass(frozen=True)
-class ProducerRef:
-    """Identifies the producer of a value for provenance tracking (ADR-0004)."""
-
-    kind: ProducerKind
-    node_uuid: str | None = None
-    output_slot: str = "out"
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize to JSON-compatible dict for SER emission."""
-        result: dict[str, Any] = {"kind": self.kind}
-        if self.node_uuid is not None:
-            result["node_uuid"] = self.node_uuid
-        if self.kind == "node":
-            result["output_slot"] = self.output_slot
-        return result
-
-
-@dataclass
-class ChannelEntry:
-    """Channel store entry with value and producer identity (PA-03D)."""
-
-    value: Any
-    producer: ProducerRef
-
-
-@dataclass(frozen=True)
-class ResolvedParam:
-    """Resolution result with value, source category, and optional ref (PA-03D)."""
-
-    value: Any
-    source: ParameterSource
-    source_ref: dict[str, Any] | None = None  # ContextSourceRef or DataSourceRef
 
 
 def parse_source_ref(raw: str) -> SourceRef:
@@ -110,7 +74,7 @@ class BindResolver(Protocol):
         context: Mapping[str, Any],
         channels: ChannelStore,
         default: Any = MISSING,
-    ) -> ResolvedParam: ...
+    ) -> Tuple[Any, ParameterSource]: ...
 
 
 class PublishPlan(Protocol):

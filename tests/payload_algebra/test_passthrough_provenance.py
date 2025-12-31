@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
-from semantiva.eir.execution_payload_algebra import InMemoryChannelStore
-from semantiva.eir.payload_algebra_contracts import ProducerRef
+from semantiva.eir.execution_payload_algebra import (
+    InMemoryChannelStore,
+    ProducerRef,
+)
 
 
 class TestPassthroughCarryForward:
@@ -21,8 +23,13 @@ class TestPassthroughCarryForward:
             kind="node", node_uuid="source-123", output_slot="out"
         )
 
-        channels.set("primary", 42, producer=original_producer)
-        channels.set("primary", 42, carry_forward_from="primary")
+        channels.set_entry("primary", value=42, producer=original_producer)
+        channels.set_entry(
+            "primary",
+            value=42,
+            producer=ProducerRef(kind="node", node_uuid="passthrough"),
+            carry_forward_from="primary",
+        )
 
         entry = channels.get_entry("primary")
         assert entry is not None
@@ -38,8 +45,8 @@ class TestPassthroughCarryForward:
             kind="node", node_uuid="transform-456", output_slot="out"
         )
 
-        channels.set("primary", 42, producer=original_producer)
-        channels.set("primary", 84, producer=new_producer)
+        channels.set_entry("primary", value=42, producer=original_producer)
+        channels.set_entry("primary", value=84, producer=new_producer)
 
         entry = channels.get_entry("primary")
         assert entry is not None

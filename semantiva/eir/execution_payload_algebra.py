@@ -24,9 +24,7 @@ from semantiva.trace._utils import serialize
 from semantiva.context_processors.context_types import ContextType
 from semantiva.eir.payload_algebra_contracts import (
     MISSING,
-    ChannelEntry,
-    ProducerRef,
-    ResolvedParam,
+    ParameterSource,
     parse_source_ref,
 )
 from semantiva.eir.runtime import _resolved_nodes_from_eir
@@ -39,6 +37,34 @@ from semantiva.registry.descriptors import instantiate_from_descriptor
 
 class PayloadAlgebraResolutionError(RuntimeError):
     """Deterministic runtime error for PA-03C/D bind/publish resolution failures."""
+
+
+@dataclass(frozen=True)
+class ProducerRef:
+    kind: str  # "pipeline_input_context" | "pipeline_input_data" | "node"
+    node_uuid: str | None = None
+    output_slot: str = "out"
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {"kind": self.kind}
+        if self.node_uuid is not None:
+            d["node_uuid"] = self.node_uuid
+        if self.kind == "node":
+            d["output_slot"] = self.output_slot
+        return d
+
+
+@dataclass
+class ChannelEntry:
+    value: Any
+    producer: ProducerRef
+
+
+@dataclass(frozen=True)
+class ResolvedParam:
+    value: Any
+    source: ParameterSource
+    source_ref: dict[str, Any] | None = None
 
 
 def _context_keys(context: Mapping[str, Any] | ContextType) -> set[str]:
@@ -75,11 +101,11 @@ class InMemoryChannelStore:
     def __init__(self) -> None:
         self._channels: dict[str, ChannelEntry] = {}
 
-    def seed_primary(self, value: Any, producer: ProducerRef | None = None) -> None:
+    def seed_primary(self, value: Any) -> None:
         """Seed primary channel with initial payload data."""
-        if producer is None:
-            producer = ProducerRef(kind="pipeline_input_data")
-        self._channels["primary"] = ChannelEntry(value=value, producer=producer)
+        self._channels["primary"] = ChannelEntry(
+            value=value, producer=ProducerRef(kind="pipeline_input_data")
+        )
 
     def get(self, name: str) -> Any:
         """Get channel value by name, returns MISSING if not found."""
@@ -90,32 +116,50 @@ class InMemoryChannelStore:
         """Get full channel entry including producer (PA-03D)."""
         return self._channels.get(name)
 
-    def set(
-        self,
-        name: str,
-        value: Any,
-        producer: ProducerRef | None = None,
-        *,
-        carry_forward_from: str | None = None,
-    ) -> None:
+    def set(self, name: str, value: Any) -> None:
         """
         Set channel value by name.
 
-        If carry_forward_from is provided and the value is unchanged, carry
-        forward the producer identity from that channel (pass-through rule).
+        Contract signature (PA-03A) does not include producer metadata;
+        preserve existing producer when possible.
+        """
+        existing = self._channels.get(name)
+        producer = (
+            existing.producer
+            if existing is not None
+            else ProducerRef(kind="pipeline_input_data")
+        )
+        self._channels[name] = ChannelEntry(value=value, producer=producer)
+
+    def set_entry(
+        self,
+        name: str,
+        *,
+        value: Any,
+        producer: ProducerRef,
+        carry_forward_from: str | None = None,
+    ) -> None:
+        """
+        Internal helper to set channel value with producer metadata.
+
+        If carry_forward_from is provided and the value matches the source
+        channel, carry forward the existing producer identity.
         """
         if carry_forward_from is not None:
             existing = self._channels.get(carry_forward_from)
-            if existing is not None and existing.value is value:
-                self._channels[name] = ChannelEntry(
-                    value=value, producer=existing.producer
-                )
-                return
+            if existing is not None:
+                same = existing.value is value
+                if not same:
+                    try:
+                        same = existing.value == value
+                    except Exception:  # pragma: no cover - defensive equality
+                        same = False
+                if same:
+                    self._channels[name] = ChannelEntry(
+                        value=value, producer=existing.producer
+                    )
+                    return
 
-        if producer is None:
-            raise PayloadAlgebraResolutionError(
-                f"Producer must be specified when setting channel '{name}'"
-            )
         self._channels[name] = ChannelEntry(value=value, producer=producer)
 
 
@@ -322,26 +366,11 @@ class PublishPlanV1:
         self,
         output_value: Any,
         channels: InMemoryChannelStore,
-        producer: ProducerRef,
-        *,
-        is_passthrough: bool = False,
-        input_channel: str = "primary",
     ) -> None:
         """
-        Apply publication plan: set output value to target channel with provenance.
-
-        If ``is_passthrough`` is True and publishing back to the input channel with
-        the same value, preserve the original producer identity.
+        Apply publication plan: set output value to target channel.
         """
-        if is_passthrough and self.out_channel == input_channel:
-            channels.set(
-                self.out_channel,
-                output_value,
-                carry_forward_from=input_channel,
-            )
-            return
-
-        channels.set(self.out_channel, output_value, producer=producer)
+        channels.set(self.out_channel, output_value)
 
 
 def execute_eir_payload_algebra(
@@ -495,13 +524,30 @@ def execute_eir_payload_algebra(
         is_passthrough = _is_passthrough_node(node)
         node_producer = ProducerRef(kind="node", node_uuid=node_uuid, output_slot="out")
 
-        publish_plan.apply(
-            result.data,
-            channels,
-            producer=node_producer,
-            is_passthrough=is_passthrough,
-            input_channel=input_channel,
-        )
+        publish_plan.apply(result.data, channels)
+        out_channel = getattr(publish_plan, "out_channel", "primary")
+        if is_passthrough and out_channel == input_channel:
+            in_entry = channels.get_entry(input_channel)
+            if in_entry is not None:
+                channels.set_entry(
+                    out_channel,
+                    value=result.data,
+                    producer=in_entry.producer,
+                    carry_forward_from=input_channel,
+                )
+            else:
+                channels.set_entry(
+                    out_channel,
+                    value=result.data,
+                    producer=ProducerRef(kind="pipeline_input_data"),
+                    carry_forward_from=input_channel,
+                )
+        else:
+            channels.set_entry(
+                out_channel,
+                value=result.data,
+                producer=node_producer,
+            )
         data = channels.get("primary")
         if data is MISSING:
             raise PayloadAlgebraResolutionError(
