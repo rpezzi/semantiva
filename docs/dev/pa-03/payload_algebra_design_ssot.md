@@ -1,6 +1,6 @@
 # Payload Algebra Design SSOT (PA-03A → PA-03D)
 
-**Status:** SSOT (repo-visible). This file freezes PA‑03 interfaces + invariants for payload algebra execution and SER correction.  
+**Status:** SSOT (repo-visible). PA‑03D COMPLETE — provenance + §4 trace validation are implemented in runtime, schema, and tests.  
 **Scope:** Payload algebra execution backend + SER correction (PA‑03D)
 
 **Drift rule:** Any change that affects meaning/identity/provenance must be treated as a deliberate decision with explicit acceptance tests. Do not “fill gaps” ad-hoc during implementation.
@@ -28,15 +28,24 @@ These are “no breaking changes” contracts for the PA‑03 implementation ser
 - `TraceDriver.on_node_event(event: SERRecord) -> None`
 - `TraceDriver.on_pipeline_end(...)`
 
+Trace drivers (explicit examples; not exhaustive):
+- `JsonlTraceDriver` (JSONL trace sink used by integration tests)
+
 2. Orchestrator public surface
 - `SemantivaOrchestrator.execute(self, pipeline_spec: dict, payload: Payload, *, transport: Optional[SemantivaTransport] = None, logger: Optional[logging.Logger] = None, trace_driver: Optional[TraceDriver] = None, ...) -> Payload`
   - PA‑03 may extend `execution_backend` literals additively only.
 
+(Integration point marker: `Orchestrator`)
+
 3. Executor substrate
 - `SemantivaExecutor.submit(self, fn: Callable[..., Any], *args: Any, ser_hooks: Optional[SERHooks] = None, **kwargs: Any) -> Future[Any]`
 
+(Integration point marker: Executors / executor)
+
 4. Transport substrate (explicitly *not* payload channels)
 - `SemantivaTransport.publish(self, channel: str, data: Any, context: ContextType, metadata: Optional[dict] = None, require_ack: bool = False) -> Optional[Future]`
+
+(Integration point marker: transport)
 
 ### B) Lifecycle invariants (must remain true under payload-algebra backends)
 
@@ -56,7 +65,18 @@ Canonical CPSV1 must be explicit:
 
 ContextProcessor nodes are data pass-through at the node boundary under default-flow continuity and therefore still participate in the defaults above.
 
-### 3.2 SER value-origin provenance
+### 3.2 SourceRef vocabulary (authoring / binding token)
+**SourceRef** (SourceRefV1) is the canonical binding-token concept used by CPSV1 `bind`.
+
+- Fully-qualified forms:
+  - `channel:<name>`
+  - `context:<key>`
+- Authoring convenience: unprefixed values are interpreted as `channel:<value>` and then canonicalized.
+- Parsing/normalization is centralized in: `parse_source_ref(...)`.
+
+**Important:** `bind` is configuration. In SER, provenance reports the *value origin* (context/data/node/default), not `"bind"`.
+
+### 3.3 SER value-origin provenance
 SER MUST report value origin for each resolved parameter using **only**:
 - `context | data | node | default`
 
@@ -64,7 +84,7 @@ Bind is configuration, not provenance. SER must never report `bind` as a provena
 
 SER MUST provide structured refs for context/data origins (`parameter_source_refs`) including effective key/channel and producer identity.
 
-### 3.3 Pass-through nodes must not corrupt producer attribution
+### 3.4 Pass-through nodes must not corrupt producer attribution
 Pass-through nodes include at minimum:
 - ContextProcessor nodes
 - DataProbe nodes (pass-through by contract: SVA320/SVA321)
@@ -105,10 +125,40 @@ PA‑03D is “done enough” when:
 
 3) Drift resistance gate:
 - schema validation + integration tests + golden provenance expectations fail deterministically on semantic drift.
+   - Regression coverage: `tests/payload_algebra/test_ser_provenance_pa03d.py`,
+     `tests/payload_algebra/test_passthrough_provenance.py`, and golden expectations in
+     `tests/payload_algebra/golden_provenance_pa03d.yaml`.
 
 ---
 
-## 6) Signature ledger (machine-checkable; used by PA-03A signature gate)
+## 6) Required minimum contents (Plan PA-03A)
+
+### 1) Entry point contract
+`execute_eir_payload_algebra(eir, payload, *, trace_hook=None) -> Payload`
+
+### 2) Internal runtime contracts (pseudo-code only; signatures frozen once approved)
+
+- ChannelStore API: get/set; seed primary; publish rules (semantics deferred)
+- SourceRef and parse_source_ref rules:
+  - `channel:<name>`, `context:<key>`, unprefixed defaults to `channel:<raw>`
+- BindResolver.resolve_param precedence + error modes:
+  - precedence intent: explicit bind > node parameters > implicit context-by-name > default
+  - must include error mode names for invalid/unknown binds and missing channel
+- PublishPlan rules:
+  - `data_key` → publish.out
+  - do not clobber primary unless publishing to primary
+- Provenance mapping rules for SER:
+  - `parameter_sources`: context | data | node | default
+  - `parameter_source_refs`: per-parameter structured refs for `context` and `data` parameters to disambiguate key/channel and producer identity. `bind` is configuration-only.
+
+### 3) Existing Semantiva integration points (explicitly name)
+- Orchestrator remains the single owner of TraceDriver lifecycle calls and SER emission.
+- SemantivaExecutor and SemantivaTransport public surfaces are unchanged.
+- Payload-algebra channel store is internal runtime state and must not be conflated with SemantivaTransport pub/sub topics.
+
+---
+
+## 7) Signature ledger (machine-checkable; used by PA-03A signature gate)
 
 <!-- PA-03A-SIGNATURE-LEDGER-START -->
 ```yaml

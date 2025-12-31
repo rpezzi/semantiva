@@ -1,0 +1,72 @@
+# Golden provenance expectations for PA-03D (ADR-0004)
+# Any drift from these expectations must fail tests deterministically.
+
+version: 1
+suite: payload_algebra_reference_suite
+
+expectations:
+  float_ref_slots_41_baseline:
+    description: "§4.1 baseline: other from context"
+    context:
+      value: 1.0
+      other: 2.0
+    parameter_sources:
+      data: data
+      other: context
+    parameter_source_refs:
+      data:
+        kind: data
+        channel: primary
+        producer:
+          kind: node
+          output_slot: out
+      other:
+        kind: context
+        key: other
+        producer:
+          kind: pipeline_input_context
+    upstream_count: 1
+
+  float_ref_slots_42_times_two:
+    description: "§4.2 times-two: other from channel:primary"
+    context:
+      value: 1.0
+    parameter_sources:
+      data: data
+      other: data
+    parameter_source_refs:
+      data:
+        kind: data
+        channel: primary
+        producer:
+          kind: node
+          output_slot: out
+      other:
+        kind: data
+        channel: primary
+        producer:
+          kind: node
+          output_slot: out
+    upstream_count: 1
+
+  float_ref_slots_43_add_second_source:
+    description: "§4.3 second-source: other from channel:addend"
+    context:
+      value: 1.0
+    parameter_sources:
+      data: data
+      other: data
+    parameter_source_refs:
+      data:
+        kind: data
+        channel: primary
+        producer:
+          kind: node
+          output_slot: out
+      other:
+        kind: data
+        channel: addend
+        producer:
+          kind: node
+          output_slot: out
+    upstream_count: 2

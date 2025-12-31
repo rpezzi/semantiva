@@ -39,7 +39,16 @@
         "parameter_sources": {
           "type": "object",
           "additionalProperties": {
-            "enum": ["context", "node", "default"]
+            "enum": ["context", "data", "node", "default"]
+          }
+        },
+        "parameter_source_refs": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {"$ref": "#/$defs/ContextSourceRef"},
+              {"$ref": "#/$defs/DataSourceRef"}
+            ]
           }
         }
       },
@@ -112,6 +121,36 @@
         "details": {"type": ["object", "null"]}
       },
       "additionalProperties": true
+    },
+    "ProducerRef": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["pipeline_input_context", "pipeline_input_data", "node"]},
+        "node_uuid": {"type": "string"},
+        "output_slot": {"type": "string", "default": "out"}
+      },
+      "additionalProperties": false
+    },
+    "ContextSourceRef": {
+      "type": "object",
+      "required": ["kind", "key", "producer"],
+      "properties": {
+        "kind": {"const": "context"},
+        "key": {"type": "string", "minLength": 1},
+        "producer": {"$ref": "#/$defs/ProducerRef"}
+      },
+      "additionalProperties": false
+    },
+    "DataSourceRef": {
+      "type": "object",
+      "required": ["kind", "channel", "producer"],
+      "properties": {
+        "kind": {"const": "data"},
+        "channel": {"type": "string", "minLength": 1},
+        "producer": {"$ref": "#/$defs/ProducerRef"}
+      },
+      "additionalProperties": false
     }
   }
 }

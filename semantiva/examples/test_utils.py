@@ -253,6 +253,13 @@ class FloatCollectValueProbe(FloatProbe):
         return data.data
 
 
+class FloatCollectDataProbe(FloatProbe):
+    """A probe that collects the FloatDataType input object itself."""
+
+    def _process_logic(self, data):
+        return data
+
+
 class FloatValueDataSource(DataSource):
     """Outputs a FloatDataType value."""
 

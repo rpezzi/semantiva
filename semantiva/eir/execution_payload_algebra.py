@@ -17,12 +17,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, MutableMapping, Tuple
+from typing import Any, Mapping, MutableMapping
+
+from semantiva.trace._utils import serialize
 
 from semantiva.context_processors.context_types import ContextType
 from semantiva.eir.payload_algebra_contracts import (
     MISSING,
-    ParameterSource,
+    ChannelEntry,
+    ProducerRef,
+    ResolvedParam,
     parse_source_ref,
 )
 from semantiva.eir.runtime import _resolved_nodes_from_eir
@@ -34,7 +38,7 @@ from semantiva.registry.descriptors import instantiate_from_descriptor
 
 
 class PayloadAlgebraResolutionError(RuntimeError):
-    """Deterministic runtime error for PA-03C bind/publish resolution failures."""
+    """Deterministic runtime error for PA-03C/D bind/publish resolution failures."""
 
 
 def _context_keys(context: Mapping[str, Any] | ContextType) -> set[str]:
@@ -63,25 +67,85 @@ def _context_get(context: Mapping[str, Any] | ContextType, key: str) -> Any:
 
 class InMemoryChannelStore:
     """
-    PA-03C channel store implementation.
+    PA-03C/D channel store implementation with producer tracking.
 
     Plan requirement: seeded with primary = initial_payload.data.
     """
 
     def __init__(self) -> None:
-        self._channels: dict[str, Any] = {}
+        self._channels: dict[str, ChannelEntry] = {}
 
-    def seed_primary(self, value: Any) -> None:
+    def seed_primary(self, value: Any, producer: ProducerRef | None = None) -> None:
         """Seed primary channel with initial payload data."""
-        self._channels["primary"] = value
+        if producer is None:
+            producer = ProducerRef(kind="pipeline_input_data")
+        self._channels["primary"] = ChannelEntry(value=value, producer=producer)
 
     def get(self, name: str) -> Any:
         """Get channel value by name, returns MISSING if not found."""
-        return self._channels.get(name, MISSING)
+        entry = self._channels.get(name)
+        return entry.value if entry is not None else MISSING
 
-    def set(self, name: str, value: Any) -> None:
-        """Set channel value by name."""
-        self._channels[name] = value
+    def get_entry(self, name: str) -> ChannelEntry | None:
+        """Get full channel entry including producer (PA-03D)."""
+        return self._channels.get(name)
+
+    def set(
+        self,
+        name: str,
+        value: Any,
+        producer: ProducerRef | None = None,
+        *,
+        carry_forward_from: str | None = None,
+    ) -> None:
+        """
+        Set channel value by name.
+
+        If carry_forward_from is provided and the value is unchanged, carry
+        forward the producer identity from that channel (pass-through rule).
+        """
+        if carry_forward_from is not None:
+            existing = self._channels.get(carry_forward_from)
+            if existing is not None and existing.value is value:
+                self._channels[name] = ChannelEntry(
+                    value=value, producer=existing.producer
+                )
+                return
+
+        if producer is None:
+            raise PayloadAlgebraResolutionError(
+                f"Producer must be specified when setting channel '{name}'"
+            )
+        self._channels[name] = ChannelEntry(value=value, producer=producer)
+
+
+class ContextProducerStore:
+    """
+    PA-03D context producer tracking (last-writer semantics).
+
+    Tracks per-key producer identity so consumed context provenance reflects
+    the value actually read (Plan legacy behavior note for multi-writers).
+    """
+
+    def __init__(self, initial_keys: set[str] | None = None) -> None:
+        """Initialize with all initial context keys attributed to pipeline input."""
+        self._producers: dict[str, ProducerRef] = {}
+        for key in initial_keys or set():
+            self._producers[key] = ProducerRef(kind="pipeline_input_context")
+
+    def get_producer(self, key: str) -> ProducerRef:
+        """Get producer for a context key (defaults to pipeline_input_context)."""
+        return self._producers.get(key, ProducerRef(kind="pipeline_input_context"))
+
+    def mark_written(self, keys: set[str], node_uuid: str) -> None:
+        """Mark keys as written by a node (last-writer update)."""
+        producer = ProducerRef(kind="node", node_uuid=node_uuid)
+        for key in keys:
+            self._producers[key] = producer
+
+    def snapshot(self) -> dict[str, ProducerRef]:
+        """Return current producer mapping (for reads during resolution)."""
+        return dict(self._producers)
 
 
 def resolve_param_value(
@@ -92,9 +156,11 @@ def resolve_param_value(
     context: Mapping[str, Any] | ContextType,
     channels: InMemoryChannelStore,
     default: Any = MISSING,
-) -> Tuple[Any, ParameterSource]:
+    context_producer: ProducerRef | None = None,
+    context_producers: Mapping[str, ProducerRef] | None = None,
+) -> ResolvedParam:
     """
-    PA-03C resolver implementing Plan precedence:
+    PA-03C/D resolver implementing Plan precedence with value-origin provenance:
 
       1) bind
       2) node parameters
@@ -103,12 +169,19 @@ def resolve_param_value(
 
     Special case: data defaults to channel:primary unless explicitly bound.
     Reject ambiguity among (1)-(3).
+    ``context_producer`` (deprecated) or ``context_producers`` identifies origin of context keys.
     """
     normalized_binds: MutableMapping[str, str] = {
         str(k): str(v) for k, v in (binds or {}).items()
     }
     if param_name == "data" and param_name not in normalized_binds:
         normalized_binds["data"] = "channel:primary"
+
+    # Use per-key producers if available, else fallback to single producer
+    if context_producers is None:
+        context_producer = context_producer or ProducerRef(
+            kind="pipeline_input_context"
+        )
 
     bind_ref = None
     if param_name in normalized_binds:
@@ -127,32 +200,108 @@ def resolve_param_value(
             )
 
         if bind_ref.kind == "channel":
-            value = channels.get(bind_ref.key)
-            if value is MISSING:
+            entry = channels.get_entry(bind_ref.key)
+            if entry is None:
                 raise PayloadAlgebraResolutionError(
                     f"Channel '{bind_ref.key}' is not available for parameter '{param_name}'."
                 )
-            return value, "bind"
+            return ResolvedParam(
+                value=entry.value,
+                source="data",
+                source_ref={
+                    "kind": "data",
+                    "channel": bind_ref.key,
+                    "producer": entry.producer.to_dict(),
+                },
+            )
 
         if bind_ref.kind == "context":
             if bind_ref.key not in _context_keys(context):
                 raise PayloadAlgebraResolutionError(
                     f"Context key '{bind_ref.key}' is not available for parameter '{param_name}'."
                 )
-            return _context_get(context, bind_ref.key), "bind"
+            # Use per-key producer if available
+            if context_producers:
+                effective_producer = context_producers.get(bind_ref.key)
+                if effective_producer is None:
+                    effective_producer = (
+                        context_producer
+                        if context_producer
+                        else ProducerRef(kind="pipeline_input_context")
+                    )
+            else:
+                effective_producer = (
+                    context_producer
+                    if context_producer
+                    else ProducerRef(kind="pipeline_input_context")
+                )
+            return ResolvedParam(
+                value=_context_get(context, bind_ref.key),
+                source="context",
+                source_ref={
+                    "kind": "context",
+                    "key": bind_ref.key,
+                    "producer": effective_producer.to_dict(),
+                },
+            )
 
     if param_name in node_params:
-        return node_params[param_name], "node"
+        return ResolvedParam(value=node_params[param_name], source="node")
 
     if param_name in _context_keys(context):
-        return _context_get(context, param_name), "context"
+        # Use per-key producer if available
+        if context_producers:
+            effective_producer = context_producers.get(param_name)
+            if effective_producer is None:
+                effective_producer = (
+                    context_producer
+                    if context_producer
+                    else ProducerRef(kind="pipeline_input_context")
+                )
+        else:
+            effective_producer = (
+                context_producer
+                if context_producer
+                else ProducerRef(kind="pipeline_input_context")
+            )
+        return ResolvedParam(
+            value=_context_get(context, param_name),
+            source="context",
+            source_ref={
+                "kind": "context",
+                "key": param_name,
+                "producer": effective_producer.to_dict(),
+            },
+        )
 
     if default is not MISSING:
-        return default, "default"
+        return ResolvedParam(value=default, source="default")
 
     raise PayloadAlgebraResolutionError(
         f"Unable to resolve parameter '{param_name}' via bind/node/context/default."
     )
+
+
+def _is_passthrough_node(node: Any) -> bool:
+    """
+    Determine if a node is pass-through for data (ADR-0004 §5).
+
+    Pass-through nodes: ContextProcessor, DataProbe, DataSink
+    """
+    processor = getattr(node, "processor", None)
+    if processor is None:
+        return False
+
+    processor_cls = type(processor)
+    name = processor_cls.__name__
+    if "ContextProcessor" in name:
+        return True
+
+    if hasattr(processor_cls, "__mro__"):
+        for cls in processor_cls.__mro__:
+            if cls.__name__ in {"DataProbe", "DataSink"}:
+                return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -169,12 +318,30 @@ class PublishPlanV1:
         out = channels.get("out") or "primary"
         return cls(out_channel=str(out))
 
-    def apply(self, output_value: Any, channels: InMemoryChannelStore) -> None:
-        """Apply publication plan: set output value to target channel."""
-        if self.out_channel == "primary":
-            channels.set("primary", output_value)
+    def apply(
+        self,
+        output_value: Any,
+        channels: InMemoryChannelStore,
+        producer: ProducerRef,
+        *,
+        is_passthrough: bool = False,
+        input_channel: str = "primary",
+    ) -> None:
+        """
+        Apply publication plan: set output value to target channel with provenance.
+
+        If ``is_passthrough`` is True and publishing back to the input channel with
+        the same value, preserve the original producer identity.
+        """
+        if is_passthrough and self.out_channel == input_channel:
+            channels.set(
+                self.out_channel,
+                output_value,
+                carry_forward_from=input_channel,
+            )
             return
-        channels.set(self.out_channel, output_value)
+
+        channels.set(self.out_channel, output_value, producer=producer)
 
 
 def execute_eir_payload_algebra(
@@ -186,8 +353,8 @@ def execute_eir_payload_algebra(
     """
     Execute a classic_linear payload-algebra plan (channel store + bind/publish).
 
-    This harness intentionally mirrors PA-03C orchestrator semantics without
-    altering SER/provenance. It is suitable for lightweight execution or tests.
+    PA-03C: core execution semantics
+    PA-03D: provenance tracking for SER emission (with last-writer context producers)
     """
     canonical, resolved_spec = _resolved_nodes_from_eir(dict(eir))
     nodes: list = []
@@ -204,9 +371,19 @@ def execute_eir_payload_algebra(
     data = payload.data
     context = payload.context
 
+    # PA-03D: per-key context producer tracking (last-writer)
+    initial_keys = set()
+    if hasattr(context, "keys") and callable(context.keys):
+        initial_keys = set(context.keys())
+    elif isinstance(context, dict):
+        initial_keys = set(context.keys())
+    context_producer_store = ContextProducerStore(initial_keys)
+
     node_spec_by_uuid: dict[str, dict[str, Any]] = {
         str(n.get("node_uuid")): n for n in canonical.get("nodes", []) if n
     }
+
+    provenance: list[dict[str, Any]] = []
 
     for node, node_def in zip(nodes, node_defs):
         node_uuid = getattr(node, "node_uuid", None) or node_def.get("node_uuid", "")
@@ -218,30 +395,113 @@ def execute_eir_payload_algebra(
         param_names: list[str] = list(
             getattr(node.processor, "get_processing_parameter_names", lambda: [])()
         )
+
+        # Snapshot context producers before resolution
+        context_producers_snapshot = context_producer_store.snapshot()
+
         resolved: dict[str, Any] = {}
+        param_sources: dict[str, str] = {}
+        param_source_refs: dict[str, dict[str, Any]] = {}
+        upstream: list[str] = []
+
         for name in param_names:
-            resolved[name], _ = resolve_param_value(
+            res = resolve_param_value(
                 name,
                 binds=binds,
                 node_params=params_cfg,
                 context=context,
                 channels=channels,
+                context_producers=context_producers_snapshot,
             )
+            resolved[name] = res.value
+            param_sources[name] = res.source
+            if res.source_ref is not None:
+                param_source_refs[name] = res.source_ref
+                producer = res.source_ref.get("producer", {})
+                if producer.get("kind") == "node" and producer.get("node_uuid"):
+                    if producer["node_uuid"] not in upstream:
+                        upstream.append(producer["node_uuid"])
 
-        input_data, _ = resolve_param_value(
+        data_result = resolve_param_value(
             "data",
             binds=binds,
             node_params=params_cfg,
             context=context,
             channels=channels,
+            context_producers=context_producers_snapshot,
         )
+        input_data = data_result.value
+        param_sources["data"] = data_result.source
+        if data_result.source_ref is not None:
+            param_source_refs["data"] = data_result.source_ref
+            producer = data_result.source_ref.get("producer", {})
+            if producer.get("kind") == "node" and producer.get("node_uuid"):
+                if producer["node_uuid"] not in upstream:
+                    upstream.append(producer["node_uuid"])
 
-        # Use overlay instead of mutating processor_config
+        input_channel = "primary"
+        if "data" in binds:
+            bind_ref = parse_source_ref(binds["data"])
+            if bind_ref.kind == "channel":
+                input_channel = bind_ref.key
+
+        # Capture pre-execution context fingerprints to detect writes.
+        # This must happen before execution to detect in-place mutation.
+        pre_context_keys = set()
+        if hasattr(context, "keys") and callable(context.keys):
+            pre_context_keys = set(context.keys())
+        elif isinstance(context, dict):
+            pre_context_keys = set(context.keys())
+
+        pre_fingerprints: dict[str, bytes] = {}
+        for key in pre_context_keys:
+            try:
+                pre_fingerprints[key] = serialize(_context_get(context, key))
+            except Exception:
+                # Conservative: if we can't fingerprint, assume it may be written
+                pre_fingerprints[key] = b"__semantiva_unfingerprintable__"
 
         with param_resolution_overlay(resolved):
             result = node.process(Payload(input_data, context))
 
-        publish_plan.apply(result.data, channels)
+        # Detect context writes and update producer tracking
+        post_context_keys = set()
+        if hasattr(result.context, "keys") and callable(result.context.keys):
+            post_context_keys = set(result.context.keys())
+        elif isinstance(result.context, dict):
+            post_context_keys = set(result.context.keys())
+
+        written_keys = post_context_keys - pre_context_keys
+
+        # Also check for updated keys using pre/post fingerprints.
+        for key in pre_context_keys & post_context_keys:
+            try:
+                post_fp = serialize(_context_get(result.context, key))
+            except Exception:
+                written_keys.add(key)
+                continue
+
+            pre_fp = pre_fingerprints.get(key)
+            if pre_fp is None:
+                written_keys.add(key)
+                continue
+
+            if pre_fp != post_fp:
+                written_keys.add(key)
+
+        if written_keys:
+            context_producer_store.mark_written(written_keys, node_uuid)
+
+        is_passthrough = _is_passthrough_node(node)
+        node_producer = ProducerRef(kind="node", node_uuid=node_uuid, output_slot="out")
+
+        publish_plan.apply(
+            result.data,
+            channels,
+            producer=node_producer,
+            is_passthrough=is_passthrough,
+            input_channel=input_channel,
+        )
         data = channels.get("primary")
         if data is MISSING:
             raise PayloadAlgebraResolutionError(
@@ -249,8 +509,17 @@ def execute_eir_payload_algebra(
             )
         context = result.context
 
-    # Emit minimal trace hook notification if provided
+        provenance.append(
+            {
+                "node_uuid": node_uuid,
+                "param_sources": param_sources,
+                "param_source_refs": param_source_refs,
+                "upstream": upstream,
+            }
+        )
+
+    # Emit trace hook notification with provenance if provided
     if callable(trace_hook):
-        trace_hook("end", {"nodes": len(nodes)})
+        trace_hook("end", {"nodes": len(nodes), "provenance": provenance})
 
     return Payload(data, context)

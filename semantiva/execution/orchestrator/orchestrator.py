@@ -192,15 +192,42 @@ class SemantivaOrchestrator(ABC):
             raise RuntimeError("Failed to resolve pipeline specification for execution")
 
         payload_algebra_backend = execution_backend == "eir_payload_algebra"
+
+        # Pylint control-flow friendliness: these are assigned in payload-algebra
+        # mode, but referenced later inside closures.
+        def _default_passthrough_checker(_node: object) -> bool:
+            return False
+
+        passthrough_checker: Callable[[object], bool] = _default_passthrough_checker
+        producer_ref_type: object | None = None
+
         channels = None
         canonical_nodes_by_uuid: dict[str, dict[str, Any]] = {}
+        context_producer_store = None
         if payload_algebra_backend:
             from semantiva.eir.execution_payload_algebra import (
                 InMemoryChannelStore,
+                ContextProducerStore,
+                _is_passthrough_node,
+            )
+            from semantiva.eir.payload_algebra_contracts import (
+                ProducerRef,
+                parse_source_ref,
             )
 
             channels = InMemoryChannelStore()
             channels.seed_primary(data)
+
+            passthrough_checker = cast(Callable[[object], bool], _is_passthrough_node)
+            producer_ref_type = ProducerRef
+
+            # PA-03D: per-key context producer tracking (last-writer)
+            initial_ctx_keys = set()
+            if hasattr(context, "keys") and callable(context.keys):
+                initial_ctx_keys = set(context.keys())
+            elif isinstance(context, dict):
+                initial_ctx_keys = set(context.keys())
+            context_producer_store = ContextProducerStore(initial_ctx_keys)
             canonical_nodes_by_uuid = {
                 str(n.get("node_uuid")): n
                 for n in canonical.get("nodes", [])
@@ -336,6 +363,9 @@ class SemantivaOrchestrator(ABC):
                     assert (
                         channels is not None
                     ), "channels required for payload_algebra_backend"
+                    assert (
+                        context_producer_store is not None
+                    ), "context_producer_store required for payload_algebra_backend"
 
                     node_spec = dict(canonical_nodes_by_uuid.get(node_id, {}))
                     node_spec.update(node_def or {})
@@ -349,32 +379,59 @@ class SemantivaOrchestrator(ABC):
                             node.processor, "get_processing_parameter_names", lambda: []
                         )()
                     )
+
+                    # PA-03D: snapshot context producers before resolution
+                    context_producers_snapshot = context_producer_store.snapshot()
+
                     resolved_params: dict[str, Any] = {}
                     param_sources = {}
+                    param_source_refs: dict[str, dict[str, Any]] = {}
+                    upstream_producers: list[str] = []
                     for name in param_names:
                         default_value = self._payload_algebra_default(
                             defaults_map, name
                         )
-                        val, src = resolve_param_value(
+                        res = resolve_param_value(
                             name,
                             binds=binds,
                             node_params=node_params_cfg,
                             context=pre_ctx_view,
                             channels=channels,
                             default=default_value,
+                            context_producers=context_producers_snapshot,
                         )
-                        resolved_params[name] = val
-                        param_sources[name] = src
+                        resolved_params[name] = res.value
+                        param_sources[name] = res.source
+                        if res.source_ref is not None:
+                            param_source_refs[name] = res.source_ref
+                            producer = res.source_ref.get("producer", {})
+                            if (
+                                producer.get("kind") == "node"
+                                and producer.get("node_uuid")
+                                and producer["node_uuid"] not in upstream_producers
+                            ):
+                                upstream_producers.append(producer["node_uuid"])
 
-                    input_data, _ = resolve_param_value(
+                    data_result = resolve_param_value(
                         "data",
                         binds=binds,
                         node_params=node_params_cfg,
                         context=pre_ctx_view,
                         channels=channels,
                         default=MISSING,
+                        context_producers=context_producers_snapshot,
                     )
-                    # DO NOT write param_sources["data"] - keep it out of SER for PA-03C schema compatibility
+                    input_data = data_result.value
+                    param_sources["data"] = data_result.source
+                    if data_result.source_ref is not None:
+                        param_source_refs["data"] = data_result.source_ref
+                        producer = data_result.source_ref.get("producer", {})
+                        if (
+                            producer.get("kind") == "node"
+                            and producer.get("node_uuid")
+                            and producer["node_uuid"] not in upstream_producers
+                        ):
+                            upstream_producers.append(producer["node_uuid"])
 
                     expected_input_type = getattr(
                         node.processor, "input_data_type", lambda: None
@@ -386,11 +443,8 @@ class SemantivaOrchestrator(ABC):
                     ):
                         input_data = NoDataType()
 
-                    # Schema-safe view for SER emission (PA-03C): omit bind-sourced keys entirely
-                    _ALLOWED_SOURCES = {"context", "node", "default"}
-                    ser_param_sources = {
-                        k: v for k, v in param_sources.items() if v in _ALLOWED_SOURCES
-                    }
+                    ser_param_sources = dict(param_sources)
+                    ser_param_source_refs = dict(param_source_refs)
 
                     runtime_config = dict(node_params_cfg)
                     runtime_config.update(resolved_params)
@@ -400,12 +454,27 @@ class SemantivaOrchestrator(ABC):
                     params = {
                         k: serialize_json_safe(v) for k, v in resolved_params.items()
                     }
+
+                    if upstream_producers:
+                        upstream_map[node_id] = upstream_producers
+                    input_channel = "primary"
+                    if "data" in binds:
+                        try:
+                            bind_ref = parse_source_ref(binds["data"])
+                            if bind_ref.kind == "channel":
+                                input_channel = bind_ref.key
+                        except Exception:
+                            input_channel = "primary"
                 else:
                     required_keys = self._required_keys_for(node, node_def)
                     params, param_sources = self._resolve_params_with_sources(
                         node, node_def, pre_ctx_view, required_keys
                     )
                     ser_param_sources = param_sources
+                    ser_param_source_refs = {}
+                    input_channel = "primary"
+
+                ser_upstream = upstream_map.get(node_id, [])
 
                 pre_checks = self._build_pre_checks(
                     node, pre_ctx_view, input_data, required_keys
@@ -413,16 +482,27 @@ class SemantivaOrchestrator(ABC):
                     node, pre_ctx_view, input_data, required_keys
                 )
 
+                # PA-03D: snapshot context fingerprints before execution.
+                # This must happen before node runs to detect in-place mutation.
+                pre_ctx_fingerprints: dict[str, bytes] = {}
+                if payload_algebra_backend:
+                    for k, v in pre_ctx_view.items():
+                        try:
+                            pre_ctx_fingerprints[str(k)] = serialize(v)
+                        except Exception:
+                            pre_ctx_fingerprints[str(k)] = (
+                                b"__semantiva_unfingerprintable__"
+                            )
+
                 collector = DeltaCollector(
                     enable_hash=bool(trace_opts.get("hash")),
                     enable_repr=bool(trace_opts.get("repr")),
                 )
                 hooks = SemantivaExecutor.SERHooks(
-                    upstream=upstream_map.get(node_id, []),
+                    upstream=ser_upstream,
                     trigger="dependency",
                     upstream_evidence=[
-                        {"node_id": u, "state": "completed"}
-                        for u in upstream_map.get(node_id, [])
+                        {"node_id": u, "state": "completed"} for u in ser_upstream
                     ],
                     context_delta_provider=lambda: collector.compute(
                         pre_ctx=pre_ctx_view,
@@ -468,13 +548,49 @@ class SemantivaOrchestrator(ABC):
                     if payload_algebra_backend and publish_plan is not None:
                         # Type assertion: channels guaranteed non-None in payload_algebra mode
                         assert channels is not None
-                        publish_plan.apply(result.data, channels)
+                        assert context_producer_store is not None
+                        assert producer_ref_type is not None
+                        is_passthrough = passthrough_checker(node)
+                        node_producer = cast(Any, producer_ref_type)(
+                            kind="node", node_uuid=node_id, output_slot="out"
+                        )
+                        publish_plan.apply(
+                            result.data,
+                            channels,
+                            producer=node_producer,
+                            is_passthrough=is_passthrough,
+                            input_channel=input_channel,
+                        )
                         data = channels.get("primary")
                         if data is MISSING:
                             raise PayloadAlgebraResolutionError(
                                 "Primary channel missing after publish; ensure a source populated it."
                             )
                         context = exec_context
+
+                        # PA-03D: detect context writes and update producer tracking
+                        post_ctx_view = self._context_snapshot(context)
+                        written_keys = set()
+                        created_keys = set(post_ctx_view.keys()) - set(
+                            pre_ctx_view.keys()
+                        )
+                        written_keys.update(created_keys)
+
+                        # Check for updated keys using fingerprint comparison.
+                        for key in set(pre_ctx_view.keys()) & set(post_ctx_view.keys()):
+                            pre_fp = pre_ctx_fingerprints.get(str(key))
+                            if pre_fp is None:
+                                written_keys.add(key)
+                                continue
+                            try:
+                                post_fp = serialize(post_ctx_view.get(key))
+                            except Exception:
+                                written_keys.add(key)
+                                continue
+                            if pre_fp != post_fp:
+                                written_keys.add(key)
+                        if written_keys:
+                            context_producer_store.mark_written(written_keys, node_id)
                     else:
                         data, context = payload.data, exec_context
                     post_ctx_view = self._context_snapshot(context)
@@ -503,7 +619,7 @@ class SemantivaOrchestrator(ABC):
                             node_id=node_id,
                             pipeline_id=pipeline_token,
                             run_id=run_token,
-                            upstream_ids=upstream_map.get(node_id, []),
+                            upstream_ids=ser_upstream,
                             trigger=hooks.trigger,
                             upstream_evidence=hooks.upstream_evidence,
                             pre_checks=pre_checks,
@@ -518,6 +634,7 @@ class SemantivaOrchestrator(ABC):
                             },
                             params=params,
                             param_sources=ser_param_sources,
+                            param_source_refs=ser_param_source_refs,
                             summaries=summaries,
                             error=None,
                         )
@@ -559,7 +676,7 @@ class SemantivaOrchestrator(ABC):
                             node_id=node_id,
                             pipeline_id=pipeline_token,
                             run_id=run_token,
-                            upstream_ids=upstream_map.get(node_id, []),
+                            upstream_ids=ser_upstream,
                             trigger=hooks.trigger,
                             upstream_evidence=hooks.upstream_evidence,
                             pre_checks=pre_checks,
@@ -574,6 +691,7 @@ class SemantivaOrchestrator(ABC):
                             },
                             params=params,
                             param_sources=ser_param_sources,
+                            param_source_refs=ser_param_source_refs,
                             summaries=summaries,
                             error={
                                 "type": type(exc).__name__,
@@ -1044,6 +1162,7 @@ class SemantivaOrchestrator(ABC):
         timing: dict[str, Any],
         params: dict[str, Any],
         param_sources: dict[str, str],
+        param_source_refs: dict[str, dict[str, Any]] | None,
         summaries: dict[str, dict[str, object]] | None,
         error: dict[str, Any] | None,
     ) -> SERRecord:
@@ -1067,6 +1186,7 @@ class SemantivaOrchestrator(ABC):
         except Exception:
             proc_meta = {}
         pre = proc_meta.get("preprocessor") if isinstance(proc_meta, dict) else None
+        processor_extra: dict[str, Any] = {}
 
         # Build preprocessing_provenance with raw expressions
         preprocessing_data = {}
@@ -1082,10 +1202,12 @@ class SemantivaOrchestrator(ABC):
                     prov.setdefault("param_expressions", {}).setdefault(param_name, {})[
                         "expr"
                     ] = expr_src
-            preprocessing_data = {
-                "semantic_id": compute_node_semantic_id(pre),
-                "preprocessing_provenance": prov,
-            }
+                preprocessing_data = {
+                    "semantic_id": compute_node_semantic_id(pre),
+                    "preprocessing_provenance": prov,
+                }
+        if param_source_refs:
+            processor_extra["parameter_source_refs"] = param_source_refs
 
         return SERRecord(
             record_type="ser",
@@ -1097,6 +1219,7 @@ class SemantivaOrchestrator(ABC):
                 "parameters": params,
                 "parameter_sources": param_sources,
                 **preprocessing_data,
+                **processor_extra,
             },
             context_delta=context_delta,
             assertions={

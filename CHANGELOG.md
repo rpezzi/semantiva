@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [v0.6.0] - Unreleased
 
 ### Added
+- PA-03D: SER provenance upgrade for payload-algebra execution (adds `data` provenance category, structured `parameter_source_refs`, producer carry-forward, and golden regression coverage for bind/data_key flows). Tightened  provenance golden gate to use SSOT `producer{...}` refs, pinning `output_slot="out"` for data refs and enforcing attribution-correct producer mapping; implemented last-writer context producer tracking for provenance emission.
 - EIRv1: extend schema and compiler to optionally embed CPSV1 meaning (`canonical_pipeline_spec`) and deterministic derived wiring artifacts (`derived.edges`, placeholders for `derived.plan`/`derived.diagnostics`), while preserving scalar pipeline identities; enforce CPSV1-based `pipeline_id` for bind/data_key authoring specs.
 - Added CanonicalPipelineSpecV1 (CPSV1) packaged JSON Schema + strict stable JSON utilities (Phase A foundations; no runtime behavior change).
 - Added deterministic derived-edge utility for CanonicalPipelineSpecV1 along with regression coverage for topology errors.
@@ -299,4 +300,3 @@ Semantiva v0.5.0 is the first public-ready release focused on stability, observa
 - Consistent versioning between Github and Pypi
 
 [v0.1.1]: https://github.com/semantiva/semantiva/releases/tag/v0.1.1
-

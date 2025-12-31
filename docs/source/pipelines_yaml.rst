@@ -39,6 +39,47 @@ publishing to named channels via ``data_key:``.
 - ``data_key`` publishes the node's ``out`` result to the named channel.
   The default publication is ``primary``.
 
+Provenance and channel publication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Slot binding is configuration; provenance is the **value origin** observed at
+runtime. SER records report parameter provenance using ``context``,
+``data``, ``node`` or ``default`` and attach ``parameter_source_refs`` for
+context/data origins (effective key/channel + producer identity). Bind never
+appears as a provenance category.
+
+Example (from the §4 reference suite):
+
+.. code-block:: yaml
+
+   extensions: ["semantiva-examples"]
+
+   pipeline:
+     nodes:
+       - processor: FloatValueDataSource
+
+       - processor: FloatValueDataSource
+         parameters:
+           value: 2.0
+         data_key: addend
+
+       - processor: FloatAddTwoInputsOperation
+         bind:
+           other: addend
+
+At runtime, ``FloatAddTwoInputsOperation`` receives both ``data`` and ``other``
+from data channels. The emitted SER contains:
+
+* ``parameter_sources.data = data`` and ``parameter_sources.other = data``.
+* ``parameter_source_refs.data`` points to channel ``primary`` with the producer
+  node UUID.
+* ``parameter_source_refs.other`` points to channel ``addend`` with the second
+  source node as producer.
+
+Pass-through processors (ContextProcessor, DataProbe, DataSink) preserve the
+original producer when they forward a value unchanged, so producer identity
+remains stable even when values traverse multiple nodes.
+
 Running a YAML pipeline
 -----------------------
 

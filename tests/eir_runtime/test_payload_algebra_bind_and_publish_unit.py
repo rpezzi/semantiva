@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from semantiva.eir.payload_algebra_contracts import parse_source_ref
+from semantiva.eir.payload_algebra_contracts import ProducerRef, parse_source_ref
 
 
 def test_parse_source_ref_defaults_to_channel() -> None:
@@ -46,10 +46,14 @@ def test_bind_precedence_and_ambiguity_rules() -> None:
 
     channels = InMemoryChannelStore()
     channels.seed_primary("P")
-    channels.set("addend", "A")
+    channels.set(
+        "addend",
+        "A",
+        producer=ProducerRef(kind="node", node_uuid="source-1", output_slot="out"),
+    )
 
     # data default: when not explicitly bound, must resolve from primary
-    val, src = resolve_param_value(
+    res = resolve_param_value(
         "data",
         binds={},
         node_params={},
@@ -57,16 +61,11 @@ def test_bind_precedence_and_ambiguity_rules() -> None:
         channels=channels,
         default="D",
     )
-    assert val == "P"
-    assert src in {
-        "bind",
-        "default",
-        "context",
-        "node",
-    }  # source is non-gating in PA-03C
+    assert res.value == "P"
+    assert res.source == "data"
 
     # explicit bind wins
-    val2, _src2 = resolve_param_value(
+    res2 = resolve_param_value(
         "other",
         binds={"other": "channel:addend"},
         node_params={},
@@ -74,7 +73,8 @@ def test_bind_precedence_and_ambiguity_rules() -> None:
         channels=channels,
         default=None,
     )
-    assert val2 == "A"
+    assert res2.value == "A"
+    assert res2.source == "data"
 
     # ambiguity: bind + node params
     with pytest.raises(PayloadAlgebraResolutionError) as excinfo:
@@ -118,7 +118,11 @@ def test_publish_semantics_non_primary_does_not_clobber_primary() -> None:
         "publish": {"channels": {"out": "addend"}, "context_key": None}
     }
     plan = PublishPlanV1.from_cpsv1(node_spec)
-    plan.apply("OUT", channels)
+    plan.apply(
+        "OUT",
+        channels,
+        producer=ProducerRef(kind="node", node_uuid="node-out", output_slot="out"),
+    )
 
     assert channels.get("addend") == "OUT"
     assert channels.get("primary") == "PRIMARY-OLD"

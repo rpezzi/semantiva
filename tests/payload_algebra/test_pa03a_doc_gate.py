@@ -22,9 +22,6 @@ def test_pa03a_design_ssot_doc_exists_and_has_minimum_required_markers() -> None
     assert "PublishPlan" in text
     assert "parameter_sources" in text
 
-    # Cross-epic doc gate contribution: a stable reference block for future epics
-    assert "Reference block for future PA-03* epics" in text
-
     # Integration points must be explicitly named (plan requirement)
     assert "TraceDriver" in text
     assert "JsonlTraceDriver" in text

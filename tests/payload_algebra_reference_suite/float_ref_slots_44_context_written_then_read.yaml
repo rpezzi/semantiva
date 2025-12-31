@@ -1,0 +1,13 @@
+# PA-03D context producer regression: write context key via probe, then read in operation
+extensions: ["semantiva-examples"]
+
+pipeline:
+  nodes:
+    - processor: FloatValueDataSource
+      parameters:
+        value: 1.0
+
+    - processor: FloatCollectDataProbe
+      context_key: "other"
+
+    - processor: FloatAddTwoInputsOperation
